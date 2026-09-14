@@ -12,7 +12,6 @@ coverage/
 
 # Datos y archivos locales que no van al deploy
 /INBODY.csv
-/UNIDADES.csv
 /PLAN1.jpeg
 /INBODY INTRO.mp4
 /inbody-netlify.zip
