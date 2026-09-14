@@ -34,6 +34,25 @@ import {
 import { EVALUADOS_INBODY_REALES } from '../data/inbodyEvaluados';
 import { expandUnidadesPorJerarquia, hasInbodyData } from './unidadesCatalog';
 
+/** Campos oficiales de usuario en Firestore (escalafón limpio). */
+export const FIRESTORE_USER_FIELDS = [
+  'cedula',
+  'nombres',
+  'apellidos',
+  'grado',
+  'tituloC',
+  'tituloD',
+  'sexo',
+  'fechaNacimiento',
+  'fechaIngreso',
+  'tipoUsuario',
+  'unidad',
+  'region',
+  'role',
+  'mediciones',
+  'updatedAt',
+] as const;
+
 const COL_USUARIOS = 'usuarios';
 const COL_PLANES_ENTRENO = 'planesEntrenamiento';
 const COL_PLANES_NUTRI = 'planesNutricion';
@@ -356,12 +375,21 @@ export function mapFirestoreUser(cedula: string, data: Record<string, unknown>):
   const mediciones = hydrateUserMediciones(id, remoteMeds);
   const local = LOCAL_EVALUADOS_BY_CEDULA.get(id);
 
+  const tituloC = String(data.tituloC ?? local?.tituloC ?? '').trim();
+  const tituloD = String(data.tituloD ?? local?.tituloD ?? '').trim();
+  // Legado: especialidad/cargo solo si no hay títulos del escalafón
+  const especialidadLegado = String(
+    data.especialidad || data.cargo || local?.especialidad || ''
+  ).trim();
+
   return {
     cedula: id,
     nombres: nombres || local?.nombres || 'Sin nombre',
     apellidos: apellidos || local?.apellidos || '',
     grado: String(data.grado || local?.grado || ''),
-    especialidad: String(data.tituloC || data.especialidad || data.cargo || local?.especialidad || ''),
+    tituloC: tituloC || undefined,
+    tituloD: tituloD || undefined,
+    especialidad: especialidadLegado || undefined,
     sexo: (sexoRaw.startsWith('F') ? 'F' : 'M') as Sexo,
     fechaNacimiento: toIsoDate(String(data.fechaNascimento || data.fechaNacimiento || local?.fechaNacimiento || '')),
     fechaIngreso: toIsoDate(String(data.fechaIngreso || local?.fechaIngreso || '')),
@@ -369,13 +397,11 @@ export function mapFirestoreUser(cedula: string, data: Record<string, unknown>):
     unidadActual: String(data.unidad || data.unidadActual || local?.unidadActual || ''),
     region: String(data.region || data.REGIONES || local?.region || 'Sierra'),
     role,
-    rachaDias: Number(data.rachaDias || 0),
-    misionCompletadaHoy: Boolean(data.misionCompletadaHoy),
     mediciones,
   };
 }
 
-/** Persiste usuario completo (biografía + mediciones) en Firestore. */
+/** Persiste usuario limpio (solo campos oficiales) en Firestore. */
 export async function saveUserAccountToFirestore(user: UserAccount): Promise<void> {
   const id = normalizeCedula(user.cedula);
   await setDoc(
@@ -385,18 +411,15 @@ export async function saveUserAccountToFirestore(user: UserAccount): Promise<voi
       nombres: user.nombres,
       apellidos: user.apellidos,
       grado: user.grado,
-      especialidad: user.especialidad,
+      tituloC: (user.tituloC || '').trim(),
+      tituloD: (user.tituloD || '').trim(),
       sexo: user.sexo,
       fechaNacimiento: user.fechaNacimiento,
       fechaIngreso: user.fechaIngreso,
       tipoUsuario: user.tipoUsuario,
       unidad: user.unidadActual,
-      unidadActual: user.unidadActual,
       region: user.region,
       role: user.role,
-      rol: user.role,
-      rachaDias: user.rachaDias,
-      misionCompletadaHoy: user.misionCompletadaHoy,
       mediciones: user.mediciones,
       updatedAt: new Date().toISOString(),
     },
@@ -645,7 +668,7 @@ export async function exportUsuariosFiltrados(
 }
 
 export async function saveUserRoleToFirestore(cedula: string, role: UserRole): Promise<void> {
-  await setDoc(doc(db, COL_USUARIOS, normalizeCedula(cedula)), { role, rol: role }, { merge: true });
+  await setDoc(doc(db, COL_USUARIOS, normalizeCedula(cedula)), { role }, { merge: true });
 }
 
 export async function fetchPlanesEntrenamiento(): Promise<PlanEntrenamiento[]> {

@@ -148,7 +148,7 @@ export const HeaderNavbar: React.FC<HeaderNavbarProps> = ({
               {currentUser.role === 'usuario' ? (
                 <div className="flex items-center gap-1.5">
                   <span className="opacity-75 font-semibold">Usuario:</span>
-                  <span>{currentUser.grado || 'Militar'} • Servicio Activo</span>
+                  <span>{currentUser.tipoUsuario || 'Militar en Servicio Activo'}</span>
                 </div>
               ) : (
                 <span>{currentRoleInfo.label}</span>

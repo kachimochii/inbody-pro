@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserAccount, SomatotipoDefinicion, SomatotipoTipo, PlanNutricion, PlanEntrenamiento, RegionEcuador } from '../../types/inbody';
+import { UserAccount, SomatotipoDefinicion, SomatotipoTipo, PlanNutricion, PlanEntrenamiento, RegionEcuador, resolveTituloArma } from '../../types/inbody';
 import { 
   DEFINICIONES_SOMATOTIPOS, 
   CAPAS_BASE, 
@@ -331,6 +331,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
   const nombreUnidadLargo = getNombreCompletoUnidad(user.unidadActual);
   const provinciaUnidad = getProvinciaUnidad(user.unidadActual);
   const regionUnidad = getRegionUnidad(user.unidadActual);
+  const tituloArma = resolveTituloArma(user);
 
   return (
     <div className="space-y-8 pb-16">
@@ -359,13 +360,20 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
               <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${
                 isDark ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'bg-blue-50 text-blue-700 border border-blue-200'
               }`}>
-                {user.grado}
+                {user.grado}{tituloArma ? ` ${tituloArma}` : ''}
               </span>
               <span className={`px-3 py-1 rounded-full text-xs font-bold border ${
                 isDark ? 'bg-slate-950 text-slate-300 border-slate-800' : 'bg-slate-100 text-slate-700 border-slate-200'
               }`}>
                 {user.unidadActual}
               </span>
+              {user.tipoUsuario && (
+                <span className={`px-3 py-1 rounded-full text-[10px] font-bold border ${
+                  isDark ? 'bg-indigo-500/10 text-indigo-300 border-indigo-500/25' : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                }`}>
+                  {user.tipoUsuario}
+                </span>
+              )}
               <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                 Ficha: #{user.cedula}
               </span>

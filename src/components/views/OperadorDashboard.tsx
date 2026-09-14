@@ -248,16 +248,15 @@ export const OperadorDashboard: React.FC<OperadorDashboardProps> = ({
           nombres: nombres,
           apellidos: apellidos,
           grado: row.gradoDetectado || 'Cabo Segundo',
-          especialidad: 'Compañía Táctica Operativa',
+          tituloC: '',
+          tituloD: '',
           sexo: row.sexoDetectado || 'M',
           fechaNacimiento: row.fechaNacimientoDetectada || '1998-06-15',
           fechaIngreso: row.fechaIngresoDetectada || '2020-03-01',
-          tipoUsuario: row.tipoUsuarioDetectado || 'Militar Profesional',
+          tipoUsuario: row.tipoUsuarioDetectado || 'Militar en Servicio Activo',
           unidadActual: row.unidadDetectada || 'Fuerzas Armadas del Ecuador',
           region: row.regionDetectada || 'Sierra',
           role: 'usuario',
-          rachaDias: 1,
-          misionCompletadaHoy: false,
           mediciones: [newRecord]
         };
 

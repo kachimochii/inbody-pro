@@ -84,19 +84,33 @@ export interface UserAccount {
   nombres: string;
   apellidos: string;
   grado: string;
-  especialidad: string;
+  /** Arma / especialidad corta (escalafón). Preferir tituloD si viene lleno. */
+  tituloC?: string;
+  tituloD?: string;
   sexo: Sexo;
   fechaNacimiento: string;
   fechaIngreso: string;
   tipoUsuario: string;
+  /** En Firebase el campo oficial es `unidad`; aquí se normaliza a unidadActual. */
   unidadActual: string;
   region: string;
   telefono?: string;
   email?: string;
   role: UserRole;
-  rachaDias: number;
-  misionCompletadaHoy: boolean;
   mediciones: InBodyRecord[];
+  /** Legado local (INBODY embebido); no se escribe a Firebase. */
+  especialidad?: string;
+  rachaDias?: number;
+  misionCompletadaHoy?: boolean;
+}
+
+/** Preferencia: tituloD si no está vacío; si no, tituloC; si no, especialidad legado. */
+export function resolveTituloArma(user: Pick<UserAccount, 'tituloC' | 'tituloD' | 'especialidad'>): string {
+  const d = (user.tituloD || '').trim();
+  if (d) return d;
+  const c = (user.tituloC || '').trim();
+  if (c) return c;
+  return (user.especialidad || '').trim();
 }
 
 export interface VideoComplemento {
