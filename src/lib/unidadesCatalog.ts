@@ -1,4 +1,4 @@
-import unidadesCsv from '../../UNIDADES.csv?raw';
+import unidadesCsv from '../data/UNIDADES.csv?raw';
 
 export interface UnidadInfo {
   ord: string;
