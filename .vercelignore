@@ -6,7 +6,8 @@ CEDULAS_DEMO.md
 inbody-netlify.zip
 INBODY INTRO.mp4
 PLAN1.jpeg
-somatotipos/
+# Solo originales de la raíz; NO ignorar public/somatotipos
+/somatotipos/
 dist
 *.log
 node_modules
