@@ -1,0 +1,10 @@
+rules_version = '2';
+// Pegar en: Firebase Console → Storage → Reglas → Publicar
+// (NO va en Firestore. Son paneles distintos.)
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /inbody/{allPaths=**} {
+      allow read, write: if true;
+    }
+  }
+}

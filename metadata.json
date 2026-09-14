@@ -1,0 +1,8 @@
+{
+  "name": "Simple Inbody",
+  "description": "Sistema Institucional de Diagnóstico Antropométrico InBody 270S, Evaluación Segmental, y Gestión Multirrol de Planes de Nutrición Regionales y Entrenamiento Táctico",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

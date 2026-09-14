@@ -1,0 +1,13 @@
+.env
+.env.*
+!.env.example
+INBODY.csv
+UNIDADES.csv
+CEDULAS_DEMO.md
+inbody-netlify.zip
+INBODY INTRO.mp4
+PLAN1.jpeg
+somatotipos/
+dist
+*.log
+node_modules

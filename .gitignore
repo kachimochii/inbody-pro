@@ -1,0 +1,22 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+
+# Originales pesados (~25MB); producción usa public/somatotipos/*.webp
+/somatotipos/
+
+# Datos y archivos locales que no van al deploy
+/INBODY.csv
+/UNIDADES.csv
+/PLAN1.jpeg
+/INBODY INTRO.mp4
+/inbody-netlify.zip
+/imagenes/
+/CEDULAS_DEMO.md
+/*.pptx
+/*.pdf

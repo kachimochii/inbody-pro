@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>InBody PRO</title>
+    <link rel="icon" type="image/png" href="/logos/favicon.png" />
+    <link rel="apple-touch-icon" href="/logos/favicon.png" />
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem('inbody_theme');
+          var dark = saved === 'dark' || (saved !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.classList.add(dark ? 'dark' : 'light');
+          document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+        } catch (e) {}
+      })();
+    </script>
+    <meta name="description" content="Sistema Institucional de Diagnóstico Antropométrico InBody 270 y Gestión Multirrol" />
+    <meta property="og:title" content="InBody PRO" />
+    <meta property="og:description" content="Sistema Institucional de Diagnóstico Antropométrico InBody 270 y Gestión Multirrol" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+  </head>
+  <body class="bg-slate-900 text-slate-100 antialiased selection:bg-blue-500 selection:text-white">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
