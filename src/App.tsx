@@ -23,6 +23,8 @@ import {
   upsertFichaEdad,
   deleteFichaEdad,
   saveUserRoleToFirestore,
+  saveUserAccountToFirestore,
+  appendMedicionToFirestore,
 } from './lib/firestoreService';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { HeaderNavbar } from './components/HeaderNavbar';
@@ -218,11 +220,30 @@ function MainAppContent() {
         return [fixed, ...others];
       });
       setRosterLoaded(true);
+      setInspectingUser(fixed);
     } catch (e) {
       console.error(e);
       alert('Error al buscar en Firebase.');
     } finally {
       setRosterLoading(false);
+    }
+  };
+
+  const handleInspectUser = async (user: UserAccount) => {
+    setInspectingUser(user);
+    try {
+      const fresh = await fetchUserByCedula(user.cedula);
+      if (fresh) {
+        const fixed =
+          fresh.cedula === '0703887042' ? { ...fresh, role: 'admin' as UserRole } : fresh;
+        setUsers((prev) => {
+          const others = prev.filter((u) => u.cedula !== fixed.cedula);
+          return [fixed, ...others];
+        });
+        setInspectingUser(fixed);
+      }
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -309,11 +330,15 @@ function MainAppContent() {
         mediciones: mergeMediciones(prev.mediciones)
       }) : null);
     }
+
+    // Persistencia en Firebase para que estadísticas y login queden concatenados
+    appendMedicionToFirestore(cedula, record).catch(console.error);
   };
 
   // Registrar nuevo usuario desde el módulo de operador
   const handleCreateNewUser = (newUser: UserAccount) => {
     setUsers(prev => [newUser, ...prev]);
+    saveUserAccountToFirestore(newUser).catch(console.error);
   };
 
   const handleUpdateUserRole = (cedula: string, role: UserRole) => {
@@ -417,7 +442,7 @@ function MainAppContent() {
         currentUser={currentUser}
         inspectingUser={inspectingUser}
         onBackToAdmin={() => setInspectingUser(null)}
-        onViewOwnFicha={currentRole === 'admin' ? () => setInspectingUser(currentUser) : undefined}
+        onViewOwnFicha={currentRole === 'admin' ? () => handleInspectUser(currentUser) : undefined}
         onLogout={handleLogout}
       />
 
@@ -476,8 +501,8 @@ function MainAppContent() {
             <AdminDashboard
               users={users}
               currentUser={currentUser}
-              onSelectUser={(u) => setInspectingUser(u)}
-              onViewOwnFicha={() => setInspectingUser(currentUser)}
+              onSelectUser={(u) => handleInspectUser(u)}
+              onViewOwnFicha={() => handleInspectUser(currentUser)}
               onUpdateUserRole={handleUpdateUserRole}
               onDeleteUser={handleDeleteUser}
               onPurgeDemoUsers={handlePurgeDemoUsers}

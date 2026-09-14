@@ -27,7 +27,11 @@ import {
   PlanNutricion,
   FichaEdadCatalogo,
   Sexo,
+  InBodyRecord,
+  SomatotipoTipo,
+  SegmentalValues,
 } from '../types/inbody';
+import { EVALUADOS_INBODY_REALES } from '../data/inbodyEvaluados';
 import { expandUnidadesPorJerarquia, hasInbodyData } from './unidadesCatalog';
 
 const COL_USUARIOS = 'usuarios';
@@ -36,6 +40,139 @@ const COL_PLANES_NUTRI = 'planesNutricion';
 const COL_FICHAS = 'fichasEdad';
 
 export const ROSTER_PAGE_SIZE = 100;
+
+export function normalizeCedula(cedula: string): string {
+  return String(cedula || '').replace(/\D/g, '').padStart(10, '0').slice(-10);
+}
+
+const LOCAL_EVALUADOS_BY_CEDULA = new Map(
+  EVALUADOS_INBODY_REALES.map((u) => [normalizeCedula(u.cedula), u])
+);
+
+function numField(raw: Record<string, unknown>, keys: string[], fallback = 0): number {
+  for (const key of keys) {
+    const n = Number(raw[key]);
+    if (Number.isFinite(n) && n !== 0) return n;
+  }
+  for (const key of keys) {
+    const n = Number(raw[key]);
+    if (Number.isFinite(n)) return n;
+  }
+  return fallback;
+}
+
+function strField(raw: Record<string, unknown>, keys: string[], fallback = ''): string {
+  for (const key of keys) {
+    const v = raw[key];
+    if (v !== undefined && v !== null && String(v).trim() !== '') return String(v);
+  }
+  return fallback;
+}
+
+const EMPTY_SEGMENTAL: SegmentalValues = {
+  musculoBD: 0, musculoBDPct: 100,
+  musculoBI: 0, musculoBIPct: 100,
+  musculoTR: 0, musculoTRPct: 100,
+  musculoPD: 0, musculoPDPct: 100,
+  musculoPI: 0, musculoPIPct: 100,
+  grasaBD: 0, grasaBDPct: 100,
+  grasaBI: 0, grasaBIPct: 100,
+  grasaTR: 0, grasaTRPct: 100,
+  grasaPD: 0, grasaPDPct: 100,
+  grasaPI: 0, grasaPIPct: 100,
+};
+
+function normalizeMedicion(raw: unknown, cedula: string, index: number): InBodyRecord | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const peso = numField(r, ['peso', 'pesoKg', 'weight', 'Weight', 'Peso_kg']);
+  const alturaCm = numField(r, ['alturaCm', 'altura', 'height', 'Height', 'Estatura_cm']);
+  const inbodyScore = numField(r, ['inbodyScore', 'score', 'Score_InBody', 'puntaje']);
+  if (peso <= 0 && alturaCm <= 0 && inbodyScore <= 0) return null;
+
+  const segRaw = r.segmental && typeof r.segmental === 'object'
+    ? (r.segmental as Partial<SegmentalValues>)
+    : {};
+
+  const tipoRaw = strField(r, ['tipoCuerpo', 'somatotipo', 'tipo_cuerpo'], 'Tipo estándar');
+
+  return {
+    id: strField(r, ['id'], `med-${cedula}-${index}`),
+    fecha: toIsoDate(strField(r, ['fecha', 'fechaMedicion', 'Fecha_Medicion'], new Date().toISOString().slice(0, 10))),
+    alturaCm,
+    peso,
+    aguaKg: numField(r, ['aguaKg', 'agua']),
+    proteinaKg: numField(r, ['proteinaKg', 'proteina']),
+    mineralesKg: numField(r, ['mineralesKg', 'minerales']),
+    grasaKg: numField(r, ['grasaKg', 'grasa', 'Grasa_kg']),
+    ffmKg: numField(r, ['ffmKg', 'ffm']),
+    musculoKg: numField(r, ['musculoKg', 'musculo', 'smm', 'Musculo_kg']),
+    imc: numField(r, ['imc', 'bmi']),
+    pctGrasa: numField(r, ['pctGrasa', 'pbf', 'porcentajeGrasa']),
+    inbodyScore,
+    tmb: numField(r, ['tmb', 'bmr']),
+    grasaVisceral: numField(r, ['grasaVisceral', 'Grasa_Visceral', 'vfl']),
+    grasaSubcutaneaKg: numField(r, ['grasaSubcutaneaKg']),
+    adiposidad: numField(r, ['adiposidad']),
+    caloriasRecomendadas: numField(r, ['caloriasRecomendadas']),
+    tipoCuerpo: tipoRaw as SomatotipoTipo,
+    edadCorporal: numField(r, ['edadCorporal']),
+    pesoIdeal: numField(r, ['pesoIdeal']),
+    controlPeso: numField(r, ['controlPeso']),
+    controlGrasa: numField(r, ['controlGrasa']),
+    controlMuscular: numField(r, ['controlMuscular']),
+    rangoPesoMin: numField(r, ['rangoPesoMin']),
+    rangoPesoMax: numField(r, ['rangoPesoMax']),
+    rangoSmmMin: numField(r, ['rangoSmmMin']),
+    rangoSmmMax: numField(r, ['rangoSmmMax']),
+    rangoBfmMin: numField(r, ['rangoBfmMin']),
+    rangoBfmMax: numField(r, ['rangoBfmMax']),
+    rangoImcMin: numField(r, ['rangoImcMin'], 18.5),
+    rangoImcMax: numField(r, ['rangoImcMax'], 25),
+    rangoPbfMin: numField(r, ['rangoPbfMin'], 10),
+    rangoPbfMax: numField(r, ['rangoPbfMax'], 20),
+    segmental: { ...EMPTY_SEGMENTAL, ...segRaw },
+  };
+}
+
+function parseMedicionesRaw(data: Record<string, unknown>, cedula: string): InBodyRecord[] {
+  const candidates = [data.mediciones, data.medicion, data.inbody, data.evaluaciones, data.historico];
+  const out: InBodyRecord[] = [];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      candidate.forEach((item, i) => {
+        const med = normalizeMedicion(item, cedula, i);
+        if (med) out.push(med);
+      });
+      if (out.length) break;
+    } else if (candidate && typeof candidate === 'object') {
+      Object.values(candidate as Record<string, unknown>).forEach((item, i) => {
+        const med = normalizeMedicion(item, cedula, i);
+        if (med) out.push(med);
+      });
+      if (out.length) break;
+    }
+  }
+
+  if (!out.length) {
+    const hasInbodyRoot =
+      Number(data.inbodyScore || data.score || data.musculoKg || data.grasaKg || 0) > 0;
+    if (hasInbodyRoot) {
+      const rootMed = normalizeMedicion(data, cedula, 0);
+      if (rootMed) out.push(rootMed);
+    }
+  }
+
+  return out.sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+}
+
+/** Une mediciones de Firebase con el archivo de estadísticas locales (misma cédula). */
+export function hydrateUserMediciones(cedula: string, remote: InBodyRecord[]): InBodyRecord[] {
+  if (hasInbodyData(remote)) return remote;
+  const local = LOCAL_EVALUADOS_BY_CEDULA.get(normalizeCedula(cedula));
+  return local?.mediciones?.length ? local.mediciones : remote;
+}
 
 export type RosterJerarquia = 'unidad' | 'padre' | 'abuelo';
 export type RosterDatosFilter = 'TODOS' | 'CON' | 'SIN';
@@ -204,6 +341,7 @@ function toIsoDate(raw: string): string {
 }
 
 export function mapFirestoreUser(cedula: string, data: Record<string, unknown>): UserAccount {
+  const id = normalizeCedula(cedula);
   const fullName = String(data.nombres || data.nombre || '');
   const { nombres, apellidos } = data.apellidos
     ? { nombres: fullName, apellidos: String(data.apellidos) }
@@ -214,32 +352,81 @@ export function mapFirestoreUser(cedula: string, data: Record<string, unknown>):
   const validRoles: UserRole[] = ['admin', 'operador', 'usuario', 'entrenador', 'nutricionista'];
   const role = (validRoles.includes(roleRaw as UserRole) ? roleRaw : 'usuario') as UserRole;
 
+  const remoteMeds = parseMedicionesRaw(data, id);
+  const mediciones = hydrateUserMediciones(id, remoteMeds);
+  const local = LOCAL_EVALUADOS_BY_CEDULA.get(id);
+
   return {
-    cedula: String(cedula).replace(/\D/g, '').padStart(10, '0').slice(-10),
-    nombres,
-    apellidos,
-    grado: String(data.grado || ''),
-    especialidad: String(data.tituloC || data.especialidad || data.cargo || ''),
+    cedula: id,
+    nombres: nombres || local?.nombres || 'Sin nombre',
+    apellidos: apellidos || local?.apellidos || '',
+    grado: String(data.grado || local?.grado || ''),
+    especialidad: String(data.tituloC || data.especialidad || data.cargo || local?.especialidad || ''),
     sexo: (sexoRaw.startsWith('F') ? 'F' : 'M') as Sexo,
-    fechaNacimiento: toIsoDate(String(data.fechaNascimento || data.fechaNacimiento || '')),
-    fechaIngreso: toIsoDate(String(data.fechaIngreso || '')),
-    tipoUsuario: String(data.tipoUsuario || data.promocion || 'Militar en Servicio Activo'),
-    unidadActual: String(data.unidad || data.unidadActual || ''),
-    region: String(data.region || data.REGIONES || 'Sierra'),
+    fechaNacimiento: toIsoDate(String(data.fechaNascimento || data.fechaNacimiento || local?.fechaNacimiento || '')),
+    fechaIngreso: toIsoDate(String(data.fechaIngreso || local?.fechaIngreso || '')),
+    tipoUsuario: String(data.tipoUsuario || data.promocion || local?.tipoUsuario || 'Militar en Servicio Activo'),
+    unidadActual: String(data.unidad || data.unidadActual || local?.unidadActual || ''),
+    region: String(data.region || data.REGIONES || local?.region || 'Sierra'),
     role,
     rachaDias: Number(data.rachaDias || 0),
     misionCompletadaHoy: Boolean(data.misionCompletadaHoy),
-    mediciones: Array.isArray(data.mediciones) ? (data.mediciones as UserAccount['mediciones']) : [],
+    mediciones,
   };
+}
+
+/** Persiste usuario completo (biografía + mediciones) en Firestore. */
+export async function saveUserAccountToFirestore(user: UserAccount): Promise<void> {
+  const id = normalizeCedula(user.cedula);
+  await setDoc(
+    doc(db, COL_USUARIOS, id),
+    {
+      cedula: id,
+      nombres: user.nombres,
+      apellidos: user.apellidos,
+      grado: user.grado,
+      especialidad: user.especialidad,
+      sexo: user.sexo,
+      fechaNacimiento: user.fechaNacimiento,
+      fechaIngreso: user.fechaIngreso,
+      tipoUsuario: user.tipoUsuario,
+      unidad: user.unidadActual,
+      unidadActual: user.unidadActual,
+      region: user.region,
+      role: user.role,
+      rol: user.role,
+      rachaDias: user.rachaDias,
+      misionCompletadaHoy: user.misionCompletadaHoy,
+      mediciones: user.mediciones,
+      updatedAt: new Date().toISOString(),
+    },
+    { merge: true }
+  );
+}
+
+/** Agrega una medición al historial del usuario en Firestore (merge). */
+export async function appendMedicionToFirestore(cedula: string, record: InBodyRecord): Promise<void> {
+  const id = normalizeCedula(cedula);
+  const snap = await getDoc(doc(db, COL_USUARIOS, id));
+  const existing = snap.exists()
+    ? parseMedicionesRaw(snap.data() as Record<string, unknown>, id)
+    : [];
+  const merged = [record, ...existing.filter((m) => m.id !== record.id)].sort((a, b) =>
+    String(b.fecha).localeCompare(String(a.fecha))
+  );
+  await setDoc(doc(db, COL_USUARIOS, id), { mediciones: merged, updatedAt: new Date().toISOString() }, { merge: true });
 }
 
 /** Busca UN usuario por cédula (rápido; no descarga 25k). */
 export async function fetchUserByCedula(cedula: string): Promise<UserAccount | null> {
-  const id = cedula.replace(/\D/g, '').padStart(10, '0').slice(-10);
+  const id = normalizeCedula(cedula);
   const snap = await getDoc(doc(db, COL_USUARIOS, id));
   if (!snap.exists()) {
     const snap2 = await getDoc(doc(db, COL_USUARIOS, cedula));
-    if (!snap2.exists()) return null;
+    if (!snap2.exists()) {
+      const local = LOCAL_EVALUADOS_BY_CEDULA.get(id);
+      return local ? { ...local, cedula: id } : null;
+    }
     return mapFirestoreUser(snap2.id, snap2.data() as Record<string, unknown>);
   }
   return mapFirestoreUser(snap.id, snap.data() as Record<string, unknown>);
@@ -458,7 +645,7 @@ export async function exportUsuariosFiltrados(
 }
 
 export async function saveUserRoleToFirestore(cedula: string, role: UserRole): Promise<void> {
-  await setDoc(doc(db, COL_USUARIOS, cedula), { role, rol: role }, { merge: true });
+  await setDoc(doc(db, COL_USUARIOS, normalizeCedula(cedula)), { role, rol: role }, { merge: true });
 }
 
 export async function fetchPlanesEntrenamiento(): Promise<PlanEntrenamiento[]> {

@@ -70,11 +70,18 @@ export const LoginModal: React.FC<LoginModalProps> = ({ users, onLoginSuccess })
       if (cedula === '0703887042') return { ...remote, role: 'admin' };
       return remote;
     }
+    // Prioriza mediciones con datos reales (Firebase hidratado o archivo InBody local)
+    const mediciones =
+      remote.mediciones?.length > 0
+        ? remote.mediciones
+        : local.mediciones?.length
+          ? local.mediciones
+          : [];
     return {
       ...local,
       ...remote,
       role: cedula === '0703887042' ? 'admin' : local.role !== 'usuario' ? local.role : remote.role,
-      mediciones: local.mediciones.length ? local.mediciones : remote.mediciones,
+      mediciones,
     };
   };
 

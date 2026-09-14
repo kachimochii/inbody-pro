@@ -55,7 +55,8 @@ import {
   Pause,
   Volume2,
   VolumeX,
-  Music
+  Music,
+  Star
 } from 'lucide-react';
 
 interface EvaluadoDashboardProps {
@@ -214,6 +215,12 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
     fraseGuia = `Te faltan ${85 - score} puntos para el Nivel 3 ideal. La disciplina es el puente entre tus metas y tus logros: inicia hoy mismo tu plan y recupera tu capacidad operativa.`;
   }
 
+  const medallaUrl = `/medallas/n${nivelNumero}.png`;
+  const soldadoUrl = `/medallas/s${nivelNumero}.png`;
+  const primerApellido = (user.apellidos || '').trim().split(/\s+/)[0] || '';
+  const etiquetaMedallaNivel3 = `${(user.grado || '').trim()} ${primerApellido}`.trim().toUpperCase();
+  const scoreBarPct = Math.min(100, Math.max(4, score));
+
   // Somatotipo actual y definición con selección de silueta según género
   const somatotipoActual = medActual.tipoCuerpo || 'Tipo estándar';
   const defActual = Object.values(DEFINICIONES_SOMATOTIPOS).find(d => d.nombre === somatotipoActual)
@@ -228,7 +235,17 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
   const defIdeal = Object.values(DEFINICIONES_SOMATOTIPOS).find(d => d.nombre === somatotipoIdealNombre)
     || DEFINICIONES_SOMATOTIPOS.muscular_estandar;
   const imagenesIdeal = MAPEO_SOMATOTIPOS[somatotipoIdealNombre] || MAPEO_SOMATOTIPOS['Tipo muscular estándar'];
+
   const siluetaIdealUrl = imagenesIdeal[selectedGender] || imagenesIdeal.M;
+
+  const somatoColorRing = (color: string) => {
+    if (color === 'rojo') return 'border-rose-500 bg-rose-500/10 shadow-rose-500/30 ring-rose-500/40';
+    if (color === 'naranja') return 'border-amber-500 bg-amber-500/10 shadow-amber-500/30 ring-amber-500/40';
+    if (color === 'verde') return 'border-emerald-500 bg-emerald-500/10 shadow-emerald-500/30 ring-emerald-500/40';
+    return 'border-blue-500 bg-blue-500/10 shadow-blue-500/30 ring-blue-500/40';
+  };
+  const actualRing = somatoColorRing(defActual.color);
+  const idealRing = 'border-cyan-500 bg-cyan-500/10 shadow-cyan-500/30 ring-cyan-500/40';
 
   // Ingesta calórica meta recomendada para entrenamiento militar
   const ingestaCaloricaMeta = medActual.caloriasRecomendadas || Math.round((medActual.tmb || 1650) * 1.55);
@@ -501,6 +518,352 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
         </div>
       </div>
 
+      {/* SECCIÓN 2: ANATOMÍA Y SILUETA CORPORAL INBODY */}
+      <div className={`${cardCls} rounded-3xl border p-6 sm:p-8 shadow-xl space-y-6 transition-colors duration-300`}>
+        <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+          <div>
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-cyan-400" />
+              <span className="text-xs font-black uppercase tracking-wider text-cyan-500 dark:text-cyan-400">
+                Análisis Anatómico Visual
+              </span>
+            </div>
+            <h2 className={`text-xl sm:text-2xl font-black mt-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              Anatomía y Siluetas InBody • Comparación Dual
+            </h2>
+            <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              Tu somatotipo actual al lado de la meta ideal, con semaforización visual de impacto.
+            </p>
+          </div>
+
+          <div className={`flex items-center gap-1 p-1.5 rounded-2xl border shrink-0 ${
+            isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-200'
+          }`}>
+            <span className={`text-xs font-bold px-2 flex items-center gap-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+              <Users className="w-3.5 h-3.5 text-cyan-500" />
+              <span className="hidden sm:inline">Ver Siluetas:</span>
+            </span>
+            <button
+              onClick={() => setSelectedGender('M')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                selectedGender === 'M'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                  : isDark ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <span>♂ Masculino</span>
+            </button>
+            <button
+              onClick={() => setSelectedGender('F')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                selectedGender === 'F'
+                  ? 'bg-pink-600 text-white shadow-md shadow-pink-600/30'
+                  : isDark ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <span>♀ Femenino</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Primero: 2 siluetas | Luego: texto de métricas */}
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div
+              onClick={() => setModalSomatotipo(defActual)}
+              className={`rounded-3xl border-4 p-4 flex flex-col items-center cursor-pointer transition-all hover:scale-[1.01] shadow-xl ring-2 ${actualRing} ${
+                isDark ? 'bg-slate-950/90' : 'bg-white'
+              }`}
+              title="Tu somatotipo actual — clic para ficha médica"
+            >
+              <div className="w-full max-w-[320px] h-80 sm:h-[22rem] flex items-center justify-center">
+                <img
+                  src={siluetaActualUrl}
+                  alt={somatotipoActual}
+                  referrerPolicy="no-referrer"
+                  className="w-full h-full object-contain drop-shadow-2xl"
+                />
+              </div>
+              <div className="w-full flex items-center justify-between gap-2 mt-3">
+                <div>
+                  <span className="text-[10px] font-black uppercase tracking-wider text-blue-500 block">Tu silueta actual</span>
+                  <h3 className={`text-sm sm:text-base font-black leading-snug ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                    {somatotipoActual}
+                  </h3>
+                </div>
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-blue-600 text-white shrink-0">Sistema</span>
+              </div>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setModalSomatotipo(defActual); }}
+                className="mt-2 text-[10px] font-bold text-blue-500 hover:text-blue-400 underline cursor-pointer"
+              >
+                Ficha Médica
+              </button>
+            </div>
+
+            <div
+              onClick={() => setModalSomatotipo(defIdeal)}
+              className={`rounded-3xl border-4 p-4 flex flex-col items-center cursor-pointer transition-all hover:scale-[1.01] shadow-xl ring-2 ${idealRing} ${
+                isDark ? 'bg-gradient-to-br from-slate-950 via-slate-900 to-cyan-950/40' : 'bg-gradient-to-br from-cyan-50 via-white to-blue-50'
+              }`}
+              title="Somatotipo meta ideal — clic para ficha médica"
+            >
+              <div className="w-full max-w-[320px] h-80 sm:h-[22rem] flex items-center justify-center">
+                <img
+                  src={siluetaIdealUrl}
+                  alt={somatotipoIdealNombre}
+                  referrerPolicy="no-referrer"
+                  className="w-full h-full object-contain drop-shadow-[0_8px_24px_rgba(6,182,212,0.35)]"
+                />
+              </div>
+              <div className="w-full flex items-center justify-between gap-2 mt-3">
+                <div>
+                  <span className="text-[10px] font-black uppercase tracking-wider text-cyan-500 block">Meta ideal</span>
+                  <h3 className={`text-sm sm:text-base font-black leading-snug ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                    {somatotipoIdealNombre}
+                  </h3>
+                </div>
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shrink-0">Objetivo</span>
+              </div>
+              <p className={`mt-2 text-[11px] text-center leading-snug ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                {medActual.controlGrasa < 0
+                  ? `Bajar ${Math.abs(medActual.controlGrasa)} kg grasa`
+                  : 'Mantener grasa'}
+                {' · '}
+                {medActual.controlMuscular > 0
+                  ? `Ganar +${medActual.controlMuscular} kg músculo`
+                  : 'Consolidar músculo'}
+              </p>
+            </div>
+          </div>
+
+          {/* Luego el texto: grasa / músculo / simetría */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className={`p-3.5 rounded-2xl border ${isDark ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+              <div className="flex items-center justify-between gap-2">
+                <span className={`text-xs font-bold flex items-center gap-1.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                  <Flame className="w-4 h-4 text-rose-400" />
+                  <span>Grasa Corporal</span>
+                </span>
+                <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${
+                  medActual.pctGrasa < 18 ? 'bg-emerald-500/20 text-emerald-400' :
+                  medActual.pctGrasa <= 24 ? 'bg-amber-500/20 text-amber-400' :
+                  'bg-rose-500/20 text-rose-400'
+                }`}>
+                  {medActual.pctGrasa < 18 ? 'Magro' : medActual.pctGrasa <= 24 ? 'Controlado' : 'Exceso'}
+                </span>
+              </div>
+              <div className={`text-lg font-black font-mono mt-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                {medActual.grasaKg.toFixed(1)} kg ({medActual.pctGrasa.toFixed(1)}%)
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1 leading-snug">
+                {medActual.pctGrasa < 18
+                  ? 'Nivel magro y atlético, excelente control de tejido graso.'
+                  : medActual.pctGrasa <= 24
+                  ? 'Nivel saludable y controlado dentro de los estándares operativos.'
+                  : 'Porcentaje elevado; se recomienda reducir tejido graso con la pauta nutricional.'}
+              </p>
+            </div>
+
+            <div className={`p-3.5 rounded-2xl border ${isDark ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+              <div className="flex items-center justify-between gap-2">
+                <span className={`text-xs font-bold flex items-center gap-1.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                  <Dumbbell className="w-4 h-4 text-blue-400" />
+                  <span>Músculo Esquelético</span>
+                </span>
+                <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${
+                  medActual.musculoKg >= medActual.rangoSmmMin ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
+                }`}>
+                  {medActual.musculoKg >= medActual.rangoSmmMin ? 'Sólido' : 'Potenciar'}
+                </span>
+              </div>
+              <div className={`text-lg font-black font-mono mt-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                {medActual.musculoKg.toFixed(1)} kg
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1 leading-snug">
+                {medActual.musculoKg >= medActual.rangoSmmMin
+                  ? 'Buena base de fuerza esquelética y tono muscular para tareas físicas.'
+                  : 'Masa muscular en rango a potenciar con entrenamiento progresivo.'}
+              </p>
+            </div>
+
+            <div className={`p-3.5 rounded-2xl border ${isDark ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+              <div className="flex items-center justify-between gap-2">
+                <span className={`text-xs font-bold flex items-center gap-1.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                  <Activity className="w-4 h-4 text-emerald-400" />
+                  <span>Simetría Corporal</span>
+                </span>
+                <span className="text-xs font-mono font-black text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                  {porcentajeSimetria}% Equilibrio
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1 leading-snug">
+                {esSimetrico
+                  ? 'Excelente equilibrio entre tu lado izquierdo y derecho (brazos y piernas nivelados).'
+                  : 'Ligera variación entre extremidades; se recomienda trabajo unilateral compensatorio.'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Debajo de las 2 siluetas: 5 segmentos */}
+        <div className={`pt-2 border-t ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+              Distribución en los 5 Segmentos Corporales:
+            </span>
+            <span className="text-[10px] text-blue-500 dark:text-blue-400 font-bold flex items-center gap-1">
+              <span>Haz clic en una zona para ver su diagnóstico</span>
+              <ChevronRight className="w-3 h-3" />
+            </span>
+          </div>
+          <div className="grid grid-cols-5 gap-2 text-center">
+            <button
+              onClick={() => setSegmentoSeleccionado('BD')}
+              className={`p-2 rounded-xl border transition-all cursor-pointer ${
+                segmentoSeleccionado === 'BD'
+                  ? 'bg-blue-600/20 border-blue-500 ring-2 ring-blue-500 shadow-md'
+                  : isDark ? 'bg-slate-900 border-slate-800 hover:border-slate-700' : 'bg-slate-100 border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              <span className="text-[9px] text-slate-400 block font-semibold">Brazo Der.</span>
+              <span className={`text-xs font-bold font-mono ${isDark ? 'text-white' : 'text-slate-900'}`}>{masaBrazosD.toFixed(2)} kg</span>
+              <span className="text-[9px] text-emerald-400 block font-black">Normal</span>
+            </button>
+            <button
+              onClick={() => setSegmentoSeleccionado('BI')}
+              className={`p-2 rounded-xl border transition-all cursor-pointer ${
+                segmentoSeleccionado === 'BI'
+                  ? 'bg-blue-600/20 border-blue-500 ring-2 ring-blue-500 shadow-md'
+                  : isDark ? 'bg-slate-900 border-slate-800 hover:border-slate-700' : 'bg-slate-100 border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              <span className="text-[9px] text-slate-400 block font-semibold">Brazo Izq.</span>
+              <span className={`text-xs font-bold font-mono ${isDark ? 'text-white' : 'text-slate-900'}`}>{masaBrazosI.toFixed(2)} kg</span>
+              <span className="text-[9px] text-emerald-400 block font-black">Normal</span>
+            </button>
+            <button
+              onClick={() => setSegmentoSeleccionado('TR')}
+              className={`p-2 rounded-xl border transition-all cursor-pointer ${
+                segmentoSeleccionado === 'TR'
+                  ? 'bg-blue-600/20 border-blue-500 ring-2 ring-blue-500 shadow-md'
+                  : isDark ? 'bg-slate-900 border-slate-800 hover:border-slate-700' : 'bg-slate-100 border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              <span className="text-[9px] text-slate-400 block font-semibold">Tronco</span>
+              <span className={`text-xs font-bold font-mono ${isDark ? 'text-white' : 'text-slate-900'}`}>{masaTronco.toFixed(1)} kg</span>
+              <span className="text-[9px] text-emerald-400 block font-black">Óptimo</span>
+            </button>
+            <button
+              onClick={() => setSegmentoSeleccionado('PD')}
+              className={`p-2 rounded-xl border transition-all cursor-pointer ${
+                segmentoSeleccionado === 'PD'
+                  ? 'bg-blue-600/20 border-blue-500 ring-2 ring-blue-500 shadow-md'
+                  : isDark ? 'bg-slate-900 border-slate-800 hover:border-slate-700' : 'bg-slate-100 border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              <span className="text-[9px] text-slate-400 block font-semibold">Pierna Der.</span>
+              <span className={`text-xs font-bold font-mono ${isDark ? 'text-white' : 'text-slate-900'}`}>{masaPiernasD.toFixed(2)} kg</span>
+              <span className="text-[9px] text-emerald-400 block font-black">Normal</span>
+            </button>
+            <button
+              onClick={() => setSegmentoSeleccionado('PI')}
+              className={`p-2 rounded-xl border transition-all cursor-pointer ${
+                segmentoSeleccionado === 'PI'
+                  ? 'bg-blue-600/20 border-blue-500 ring-2 ring-blue-500 shadow-md'
+                  : isDark ? 'bg-slate-900 border-slate-800 hover:border-slate-700' : 'bg-slate-100 border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              <span className="text-[9px] text-slate-400 block font-semibold">Pierna Izq.</span>
+              <span className={`text-xs font-bold font-mono ${isDark ? 'text-white' : 'text-slate-900'}`}>{masaPiernasI.toFixed(2)} kg</span>
+              <span className="text-[9px] text-emerald-400 block font-black">Normal</span>
+            </button>
+          </div>
+
+          {(() => {
+            const infoSeg = {
+              BD: {
+                nombre: 'Brazo Derecho (Miembro Superior)',
+                musculo: masaBrazosD,
+                musculoPct: seg.musculoBDPct ?? 105,
+                grasa: seg.grasaBD ?? 1.30,
+                evaluacion: 'Masa magra adecuada para empuje, tiro táctico y transporte de armamento militar.',
+                ejercicio: 'Dominadas con agarre supino, fondos en paralelas y press de banca.',
+                simetriaVsOpuesto: `${Math.abs(masaBrazosD - masaBrazosI).toFixed(2)} kg de diferencia vs Brazo Izquierdo.`,
+              },
+              BI: {
+                nombre: 'Brazo Izquierdo (Miembro Superior)',
+                musculo: masaBrazosI,
+                musculoPct: seg.musculoBIPct ?? 104,
+                grasa: seg.grasaBI ?? 1.28,
+                evaluacion: 'Excelente tono y simetría bilateral con el brazo dominante.',
+                ejercicio: 'Flexiones asimétricas, curl unilateral con mancuerna y remo con polea.',
+                simetriaVsOpuesto: `${Math.abs(masaBrazosD - masaBrazosI).toFixed(2)} kg de diferencia vs Brazo Derecho.`,
+              },
+              TR: {
+                nombre: 'Tronco y Zona Media (Core & Columna)',
+                musculo: masaTronco,
+                musculoPct: seg.musculoTRPct ?? 105,
+                grasa: seg.grasaTR ?? 8.50,
+                evaluacion: 'Núcleo vertebral y caja torácica con densidad muscular sólida para soportar chaleco táctico y carga.',
+                ejercicio: 'Planchas militares isométricas (2 min), elevación de piernas colgado y peso muerto.',
+                simetriaVsOpuesto: 'Eje axial central. Estabilidad y soporte de carga a las cuatro extremidades.',
+              },
+              PD: {
+                nombre: 'Pierna Derecha (Tren Inferior)',
+                musculo: masaPiernasD,
+                musculoPct: seg.musculoPDPct ?? 104,
+                grasa: seg.grasaPD ?? 2.50,
+                evaluacion: 'Potencia de propulsión y amortiguación para marcha con mochila y zancadas continuas.',
+                ejercicio: 'Sentadilla búlgara, zancadas tácticas con sobrecarga y prensa inclinada.',
+                simetriaVsOpuesto: `${Math.abs(masaPiernasD - masaPiernasI).toFixed(2)} kg de diferencia vs Pierna Izquierda.`,
+              },
+              PI: {
+                nombre: 'Pierna Izquierda (Tren Inferior)',
+                musculo: masaPiernasI,
+                musculoPct: seg.musculoPIPct ?? 103,
+                grasa: seg.grasaPI ?? 2.48,
+                evaluacion: 'Soporte estructural sólido y equilibrio neuromuscular en zancada y saltos.',
+                ejercicio: 'Sentadilla goblet profunda, saltos pliométricos y subida al banco militar con carga.',
+                simetriaVsOpuesto: `${Math.abs(masaPiernasD - masaPiernasI).toFixed(2)} kg de diferencia vs Pierna Derecha.`,
+              },
+            }[segmentoSeleccionado];
+
+            return (
+              <div className={`mt-3 p-3.5 rounded-2xl border transition-all animate-in fade-in ${
+                isDark ? 'bg-slate-900/90 border-blue-500/30' : 'bg-blue-50/80 border-blue-200 shadow-sm'
+              }`}>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 border-b pb-2 border-slate-700/50 dark:border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-blue-500" />
+                    <span className="text-xs font-black text-blue-600 dark:text-blue-400 uppercase tracking-wider">
+                      Diagnóstico: {infoSeg.nombre}
+                    </span>
+                  </div>
+                  <span className={`text-xs font-mono font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                    {infoSeg.musculo.toFixed(2)} kg músculo ({infoSeg.musculoPct}% estándar) • {infoSeg.grasa.toFixed(2)} kg grasa
+                  </span>
+                </div>
+                <p className={`text-xs mt-2 leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                  {infoSeg.evaluacion}
+                </p>
+                <div className={`mt-2.5 pt-2 border-t flex flex-col sm:flex-row sm:items-center justify-between text-[11px] gap-2 ${
+                  isDark ? 'border-slate-800 text-slate-400' : 'border-blue-100 text-slate-600'
+                }`}>
+                  <div>
+                    <strong className="text-blue-500 dark:text-blue-400">Entrenamiento prescrito:</strong> {infoSeg.ejercicio}
+                  </div>
+                  <div className="text-cyan-600 dark:text-cyan-400 font-semibold shrink-0">
+                    {infoSeg.simetriaVsOpuesto}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      </div>
+
       {/* SECCIÓN 1: SISTEMA DE 3 NIVELES (70% IZQUIERDA / 30% SEMÁFORO DERECHA) */}
       <div className={`${cardCls} rounded-3xl border p-6 sm:p-8 shadow-xl space-y-4 transition-colors duration-300`}>
         <div>
@@ -517,55 +880,142 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch pt-2">
           
-          {/* LADO IZQUIERDO: 70% (COL-SPAN-8) - PUNTAJE MEJORADO, FRASE GUÍA Y PUNTOS FALTANTES */}
-          <div className={`lg:col-span-8 ${subCardCls} border rounded-3xl p-6 sm:p-7 flex flex-col justify-between space-y-6`}>
+          {/* LADO IZQUIERDO: score + medalla + soldado sobre barra */}
+          <div className={`lg:col-span-8 ${subCardCls} border rounded-3xl p-6 sm:p-7 flex flex-col justify-between space-y-5`}>
             
             <div>
-              {/* Badge y Puntaje */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border ${nivelColorClass}`}>
-                    {nivelTexto}
-                  </span>
-                  <span className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                    InBody Score Global
-                  </span>
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border ${nivelColorClass}`}>
+                      {nivelTexto}
+                    </span>
+                    <span className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                      InBody Score Global
+                    </span>
+                  </div>
+
+                  <div className="mt-4 flex items-baseline gap-3">
+                    <span className={`text-5xl sm:text-6xl font-black font-mono tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                      {score}
+                    </span>
+                    <span className="text-xl sm:text-2xl text-slate-400 font-bold">/ 100 pts</span>
+                  </div>
                 </div>
 
-                <span className={`text-xs font-bold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                  Escala: 0 a 100 puntos
-                </span>
+                {/* Medalla de nivel + etiqueta */}
+                <div className="flex flex-col items-center shrink-0 self-center sm:self-start sm:pt-1">
+                  <div className={`relative w-24 h-24 sm:w-28 sm:h-28 rounded-full p-1 ${
+                    nivelNumero === 3
+                      ? 'shadow-[0_0_28px_rgba(16,185,129,0.35)]'
+                      : nivelNumero === 2
+                        ? 'shadow-[0_0_28px_rgba(245,158,11,0.35)]'
+                        : 'shadow-[0_0_28px_rgba(244,63,94,0.35)]'
+                  }`}>
+                    <img
+                      src={medallaUrl}
+                      alt={`Medalla Nivel ${nivelNumero}`}
+                      className="w-full h-full object-contain drop-shadow-xl"
+                    />
+                  </div>
+
+                  {nivelNumero === 3 ? (
+                    <span className="mt-2 text-sm sm:text-base font-black tracking-wide text-emerald-400 text-center max-w-[11rem] leading-tight">
+                      {etiquetaMedallaNivel3 || 'EXCELENTE'}
+                    </span>
+                  ) : (
+                    <div className={`mt-2 inline-flex items-center gap-1.5 text-[11px] sm:text-xs font-black uppercase tracking-wide ${
+                      nivelNumero === 2 ? 'text-amber-400' : 'text-rose-400'
+                    }`}>
+                      <span className={`w-2 h-2 rounded-full ${
+                        nivelNumero === 2 ? 'bg-amber-400 inbody-pulse-warn' : 'bg-rose-500 inbody-pulse-danger'
+                      }`} />
+                      <span>{nivelTexto}</span>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {/* Número grande del Score */}
-              <div className="mt-4 flex items-baseline gap-3">
-                <span className={`text-5xl sm:text-6xl font-black font-mono tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                  {score}
-                </span>
-                <span className="text-xl sm:text-2xl text-slate-400 font-bold">/ 100 pts</span>
-              </div>
-
-              {/* Barra de progreso interactiva */}
-              <div className="mt-4 space-y-2">
-                <div className={`w-full h-4 rounded-full overflow-hidden p-0.5 border relative ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-slate-200 border-slate-300'}`}>
-                  {/* Marcadores de Nivel */}
-                  <div className={`absolute left-[70%] top-0 bottom-0 w-0.5 z-10 ${isDark ? 'bg-slate-700' : 'bg-slate-400'}`} title="Límite Nivel 2 (70 pts)" />
-                  <div className={`absolute left-[85%] top-0 bottom-0 w-0.5 z-10 ${isDark ? 'bg-slate-700' : 'bg-slate-400'}`} title="Límite Nivel 3 (85 pts)" />
-                  
-                  <div 
-                    className={`h-full rounded-full transition-all duration-1000 ${
-                      nivelNumero === 3 ? 'bg-gradient-to-r from-emerald-600 to-emerald-400' :
-                      nivelNumero === 2 ? 'bg-gradient-to-r from-amber-600 to-amber-400' :
-                      'bg-gradient-to-r from-rose-600 to-rose-400'
+              {/* Barra con silueta soldado sobre el puntaje */}
+              <div className="mt-6 relative pt-20 sm:pt-24">
+                <div
+                  className="absolute bottom-7 z-20 pointer-events-none transition-all duration-700"
+                  style={{
+                    left: `clamp(1.5rem, ${scoreBarPct}%, calc(100% - 1.5rem))`,
+                    transform: 'translateX(-50%)',
+                  }}
+                >
+                  <img
+                    src={soldadoUrl}
+                    alt={`Soldado Nivel ${nivelNumero}`}
+                    className={`h-20 sm:h-24 w-auto object-contain drop-shadow-[0_0_14px_rgba(0,0,0,0.55)] ${
+                      nivelNumero === 3
+                        ? 'drop-shadow-[0_0_18px_rgba(16,185,129,0.55)]'
+                        : nivelNumero === 2
+                          ? 'drop-shadow-[0_0_18px_rgba(245,158,11,0.45)]'
+                          : 'drop-shadow-[0_0_18px_rgba(244,63,94,0.45)]'
                     }`}
-                    style={{ width: `${Math.min(100, Math.max(10, score))}%` }}
                   />
                 </div>
 
-                <div className="flex justify-between text-[11px] font-bold text-slate-400 px-1">
-                  <span className="text-rose-500">Nivel 1: 0 - 69 pts</span>
-                  <span className="text-amber-500">Nivel 2: 70 - 84 pts</span>
-                  <span className="text-emerald-500">Nivel 3: 85 - 100 pts</span>
+                <div className={`w-full h-4 rounded-full overflow-visible p-0.5 border relative ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-slate-200 border-slate-300'}`}>
+                  <div className="absolute left-[35%] top-1/2 -translate-y-1/2 -translate-x-1/2 z-10" title="Zona Nivel 1">
+                    <span className={`block w-3 h-3 rounded-full border-2 border-white/80 ${
+                      nivelNumero === 1 ? 'bg-rose-500 inbody-pulse-danger' : 'bg-rose-500/50'
+                    }`} />
+                  </div>
+                  <div className="absolute left-[70%] top-1/2 -translate-y-1/2 -translate-x-1/2 z-10" title="Límite Nivel 2 (70 pts)">
+                    <span className={`block w-3 h-3 rounded-full border-2 border-white/80 ${
+                      nivelNumero === 2 ? 'bg-amber-400 inbody-pulse-warn' : 'bg-amber-500/70'
+                    }`} />
+                  </div>
+                  <div className="absolute left-[85%] top-1/2 -translate-y-1/2 -translate-x-1/2 z-10" title="Límite Nivel 3 (85 pts)">
+                    {nivelNumero === 3 ? (
+                      <Star className="w-4 h-4 text-emerald-400 fill-emerald-400 -mt-0.5" />
+                    ) : (
+                      <span className="block w-3 h-3 rounded-full border-2 border-white/80 bg-emerald-500/70" />
+                    )}
+                  </div>
+
+                  <div
+                    className={`h-full rounded-full transition-all duration-1000 relative overflow-hidden ${
+                      nivelNumero === 3 ? 'bg-gradient-to-r from-emerald-600 to-emerald-400 shadow-[0_0_16px_rgba(16,185,129,0.45)]' :
+                      nivelNumero === 2 ? 'bg-gradient-to-r from-amber-600 to-amber-400 shadow-[0_0_16px_rgba(245,158,11,0.4)]' :
+                      'bg-gradient-to-r from-rose-600 to-rose-400 shadow-[0_0_16px_rgba(244,63,94,0.4)]'
+                    }`}
+                    style={{ width: `${scoreBarPct}%` }}
+                  />
+
+                  {/* Marcador blanco en el puntaje actual */}
+                  <div
+                    className="absolute top-1/2 z-20 w-3.5 h-3.5 rounded-full bg-white border-2 border-slate-900 shadow-md"
+                    style={{
+                      left: `${scoreBarPct}%`,
+                      transform: 'translate(-50%, -50%)',
+                    }}
+                  />
+                </div>
+
+                <div className="flex justify-between text-[11px] font-bold px-1 gap-2 mt-2">
+                  <span className={`inline-flex items-center gap-1.5 ${nivelNumero === 1 ? 'text-rose-400' : 'text-rose-500/70'}`}>
+                    <span className={`w-2.5 h-2.5 rounded-full bg-rose-500 ${nivelNumero === 1 ? 'inbody-pulse-danger' : ''}`} />
+                    {nivelNumero === 1 ? <span className="font-black uppercase tracking-wide">Peligro</span> : <span>Nivel 1</span>}
+                    <span className="opacity-70">0-69</span>
+                  </span>
+                  <span className={`inline-flex items-center gap-1.5 ${nivelNumero === 2 ? 'text-amber-400' : 'text-amber-500/70'}`}>
+                    <span className={`w-2.5 h-2.5 rounded-full bg-amber-500 ${nivelNumero === 2 ? 'inbody-pulse-warn' : ''}`} />
+                    {nivelNumero === 2 ? <span className="font-black uppercase tracking-wide">Moderado</span> : <span>Nivel 2</span>}
+                    <span className="opacity-70">70-84</span>
+                  </span>
+                  <span className={`inline-flex items-center gap-1.5 ${nivelNumero === 3 ? 'text-emerald-400' : 'text-emerald-500/70'}`}>
+                    {nivelNumero === 3 ? (
+                      <Star className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400" />
+                    ) : (
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                    )}
+                    {nivelNumero === 3 ? <span className="font-black uppercase tracking-wide">Excelente</span> : <span>Nivel 3</span>}
+                    <span className="opacity-70">85-100</span>
+                  </span>
                 </div>
               </div>
             </div>
@@ -685,423 +1135,6 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
         medicion={medActual}
         edadCronologica={edad}
       />
-
-      {/* SECCIÓN 2: ANATOMÍA Y SILUETA CORPORAL INBODY */}
-      <div className={`${cardCls} rounded-3xl border p-6 sm:p-8 shadow-xl space-y-6 transition-colors duration-300`}>
-        <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
-          <div>
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-cyan-400" />
-              <span className="text-xs font-black uppercase tracking-wider text-cyan-500 dark:text-cyan-400">
-                Análisis Anatómico Visual
-              </span>
-            </div>
-            <h2 className={`text-xl sm:text-2xl font-black mt-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-              Anatomía y Siluetas InBody • Comparación Dual
-            </h2>
-            <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-              Diagnóstico claro de tu silueta actual frente a la silueta meta militar recomendada.
-            </p>
-          </div>
-
-          {/* Selector de Género para ambas Siluetas y Matriz 3x3 */}
-          <div className={`flex items-center gap-1 p-1.5 rounded-2xl border shrink-0 ${
-            isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-200'
-          }`}>
-            <span className={`text-xs font-bold px-2 flex items-center gap-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-              <Users className="w-3.5 h-3.5 text-cyan-500" />
-              <span className="hidden sm:inline">Ver Siluetas:</span>
-            </span>
-            <button
-              onClick={() => setSelectedGender('M')}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                selectedGender === 'M'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                  : isDark ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <span>♂ Masculino</span>
-            </button>
-            <button
-              onClick={() => setSelectedGender('F')}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                selectedGender === 'F'
-                  ? 'bg-pink-600 text-white shadow-md shadow-pink-600/30'
-                  : isDark ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <span>♀ Femenino</span>
-            </button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-          
-          {/* LADO IZQUIERDO: SOMATOTIPO ACTUAL + RESUMEN BREVE DE GRASA, MÚSCULO Y SIMETRÍA */}
-          <div className={`lg:col-span-7 ${subCardCls} border rounded-3xl p-6 space-y-5 flex flex-col justify-between`}>
-            
-            <div>
-              <div className={`flex items-center justify-between border-b pb-3 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse" />
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-500 dark:text-blue-400 block">
-                      Tu Silueta y Tipo Actual ({selectedGender === 'M' ? 'Masculino' : 'Femenino'})
-                    </span>
-                  </div>
-                  <h3 className={`text-lg font-black mt-0.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                    {somatotipoActual}
-                  </h3>
-                </div>
-                <button
-                  onClick={() => setModalSomatotipo(defActual)}
-                  className="text-xs font-bold text-blue-500 hover:text-blue-400 underline cursor-pointer bg-blue-500/10 px-3 py-1 rounded-lg border border-blue-500/20"
-                >
-                  Ficha Médica
-                </button>
-              </div>
-
-              {/* Silueta e Imagen */}
-              <div className="flex flex-col sm:flex-row items-center gap-6 py-4">
-                <div 
-                  onClick={() => setModalSomatotipo(defActual)}
-                  className="w-44 h-60 bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 rounded-2xl border border-blue-500/30 p-2.5 flex items-center justify-center shrink-0 relative overflow-hidden group shadow-lg shadow-blue-500/5 cursor-pointer hover:border-blue-400 hover:scale-[1.02] transition-all"
-                  title="Haz clic para consultar la ficha médica de este somatotipo"
-                >
-                  <img
-                    src={siluetaActualUrl}
-                    alt={somatotipoActual}
-                    referrerPolicy="no-referrer"
-                    className="w-full h-full object-contain filter drop-shadow-[0_4px_16px_rgba(59,130,246,0.25)] transition-transform group-hover:scale-105"
-                  />
-                  <span className="absolute bottom-2 left-2 right-2 text-center text-[9px] font-black bg-slate-950/90 py-1 rounded text-blue-300 border border-blue-500/30 group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                    Ficha Somatotipo ({selectedGender})
-                  </span>
-                </div>
-
-                {/* Resumen breve comprensible con semaforización */}
-                <div className="flex-1 space-y-3 w-full">
-                  
-                  {/* Cuánto de Grasa */}
-                  <div className={`p-3 rounded-2xl border ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
-                    <div className="flex items-center justify-between">
-                      <span className={`text-xs font-bold flex items-center gap-1.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                        <Flame className="w-4 h-4 text-rose-400" />
-                        <span>Grasa Corporal</span>
-                      </span>
-                      <div className="flex items-center gap-1.5">
-                        <span className={`text-xs font-mono font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                          {medActual.grasaKg.toFixed(1)} kg ({medActual.pctGrasa.toFixed(1)}%)
-                        </span>
-                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${
-                          medActual.pctGrasa < 18 ? 'bg-emerald-500/20 text-emerald-400' :
-                          medActual.pctGrasa <= 24 ? 'bg-amber-500/20 text-amber-400' :
-                          'bg-rose-500/20 text-rose-400'
-                        }`}>
-                          {medActual.pctGrasa < 18 ? '🟢 Magro' : medActual.pctGrasa <= 24 ? '🟡 Controlado' : '🔴 Exceso'}
-                        </span>
-                      </div>
-                    </div>
-                    <p className="text-[11px] text-slate-400 mt-1 leading-snug">
-                      {medActual.pctGrasa < 18 
-                        ? 'Nivel magro y atlético, excelente control de tejido graso.' 
-                        : medActual.pctGrasa <= 24 
-                        ? 'Nivel saludable y controlado dentro de los estándares operativos.' 
-                        : 'Porcentaje elevado, se recomienda reducir tejido graso con la pauta nutricional.'}
-                    </p>
-                  </div>
-
-                  {/* Cuánto de Músculo */}
-                  <div className={`p-3 rounded-2xl border ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
-                    <div className="flex items-center justify-between">
-                      <span className={`text-xs font-bold flex items-center gap-1.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                        <Dumbbell className="w-4 h-4 text-blue-400" />
-                        <span>Músculo Esquelético</span>
-                      </span>
-                      <div className="flex items-center gap-1.5">
-                        <span className={`text-xs font-mono font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                          {medActual.musculoKg.toFixed(1)} kg
-                        </span>
-                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${
-                          medActual.musculoKg >= medActual.rangoSmmMin ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
-                        }`}>
-                          {medActual.musculoKg >= medActual.rangoSmmMin ? '🟢 Sólido' : '🟡 Potenciar'}
-                        </span>
-                      </div>
-                    </div>
-                    <p className="text-[11px] text-slate-400 mt-1 leading-snug">
-                      {medActual.musculoKg >= medActual.rangoSmmMin 
-                        ? 'Buena base de fuerza esquelética y tono muscular para tareas físicas.' 
-                        : 'Masa muscular en rango a potenciar con entrenamiento progresivo.'}
-                    </p>
-                  </div>
-
-                  {/* Simetría Corporal */}
-                  <div className={`p-3 rounded-2xl border ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
-                    <div className="flex items-center justify-between">
-                      <span className={`text-xs font-bold flex items-center gap-1.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                        <Activity className="w-4 h-4 text-emerald-400" />
-                        <span>Simetría Corporal</span>
-                      </span>
-                      <span className="text-xs font-mono font-black text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
-                        🟢 {porcentajeSimetria}% Equilibrio
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-400 mt-1 leading-snug">
-                      {esSimetrico 
-                        ? 'Excelente equilibrio entre tu lado izquierdo y derecho (brazos y piernas nivelados).' 
-                        : 'Ligera variación entre extremidades; se recomienda trabajo unilateral compensatorio.'}
-                    </p>
-                  </div>
-
-                </div>
-              </div>
-            </div>
-
-            {/* Segmental de los 5 Cilindros interactivo con semáforos */}
-            <div className={`pt-3 border-t ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                  Distribución en los 5 Segmentos Corporales:
-                </span>
-                <span className="text-[10px] text-blue-500 dark:text-blue-400 font-bold flex items-center gap-1">
-                  <span>Haz clic en una zona para ver su diagnóstico</span>
-                  <ChevronRight className="w-3 h-3" />
-                </span>
-              </div>
-              <div className="grid grid-cols-5 gap-2 text-center">
-                <button
-                  onClick={() => setSegmentoSeleccionado('BD')}
-                  className={`p-2 rounded-xl border transition-all cursor-pointer ${
-                    segmentoSeleccionado === 'BD'
-                      ? 'bg-blue-600/20 border-blue-500 ring-2 ring-blue-500 shadow-md'
-                      : isDark ? 'bg-slate-900 border-slate-800 hover:border-slate-700' : 'bg-slate-100 border-slate-200 hover:border-slate-300'
-                  }`}
-                >
-                  <span className="text-[9px] text-slate-400 block font-semibold">Brazo Der.</span>
-                  <span className={`text-xs font-bold font-mono ${isDark ? 'text-white' : 'text-slate-900'}`}>{masaBrazosD.toFixed(2)} kg</span>
-                  <span className="text-[9px] text-emerald-400 block font-black">🟢 Normal</span>
-                </button>
-                <button
-                  onClick={() => setSegmentoSeleccionado('BI')}
-                  className={`p-2 rounded-xl border transition-all cursor-pointer ${
-                    segmentoSeleccionado === 'BI'
-                      ? 'bg-blue-600/20 border-blue-500 ring-2 ring-blue-500 shadow-md'
-                      : isDark ? 'bg-slate-900 border-slate-800 hover:border-slate-700' : 'bg-slate-100 border-slate-200 hover:border-slate-300'
-                  }`}
-                >
-                  <span className="text-[9px] text-slate-400 block font-semibold">Brazo Izq.</span>
-                  <span className={`text-xs font-bold font-mono ${isDark ? 'text-white' : 'text-slate-900'}`}>{masaBrazosI.toFixed(2)} kg</span>
-                  <span className="text-[9px] text-emerald-400 block font-black">🟢 Normal</span>
-                </button>
-                <button
-                  onClick={() => setSegmentoSeleccionado('TR')}
-                  className={`p-2 rounded-xl border transition-all cursor-pointer ${
-                    segmentoSeleccionado === 'TR'
-                      ? 'bg-blue-600/20 border-blue-500 ring-2 ring-blue-500 shadow-md'
-                      : isDark ? 'bg-slate-900 border-slate-800 hover:border-slate-700' : 'bg-slate-100 border-slate-200 hover:border-slate-300'
-                  }`}
-                >
-                  <span className="text-[9px] text-slate-400 block font-semibold">Tronco</span>
-                  <span className={`text-xs font-bold font-mono ${isDark ? 'text-white' : 'text-slate-900'}`}>{masaTronco.toFixed(1)} kg</span>
-                  <span className="text-[9px] text-emerald-400 block font-black">🟢 Óptimo</span>
-                </button>
-                <button
-                  onClick={() => setSegmentoSeleccionado('PD')}
-                  className={`p-2 rounded-xl border transition-all cursor-pointer ${
-                    segmentoSeleccionado === 'PD'
-                      ? 'bg-blue-600/20 border-blue-500 ring-2 ring-blue-500 shadow-md'
-                      : isDark ? 'bg-slate-900 border-slate-800 hover:border-slate-700' : 'bg-slate-100 border-slate-200 hover:border-slate-300'
-                  }`}
-                >
-                  <span className="text-[9px] text-slate-400 block font-semibold">Pierna Der.</span>
-                  <span className={`text-xs font-bold font-mono ${isDark ? 'text-white' : 'text-slate-900'}`}>{masaPiernasD.toFixed(2)} kg</span>
-                  <span className="text-[9px] text-emerald-400 block font-black">🟢 Normal</span>
-                </button>
-                <button
-                  onClick={() => setSegmentoSeleccionado('PI')}
-                  className={`p-2 rounded-xl border transition-all cursor-pointer ${
-                    segmentoSeleccionado === 'PI'
-                      ? 'bg-blue-600/20 border-blue-500 ring-2 ring-blue-500 shadow-md'
-                      : isDark ? 'bg-slate-900 border-slate-800 hover:border-slate-700' : 'bg-slate-100 border-slate-200 hover:border-slate-300'
-                  }`}
-                >
-                  <span className="text-[9px] text-slate-400 block font-semibold">Pierna Izq.</span>
-                  <span className={`text-xs font-bold font-mono ${isDark ? 'text-white' : 'text-slate-900'}`}>{masaPiernasI.toFixed(2)} kg</span>
-                  <span className="text-[9px] text-emerald-400 block font-black">🟢 Normal</span>
-                </button>
-              </div>
-
-              {/* Panel Informativo Interactivo del Segmento Seleccionado */}
-              {(() => {
-                const infoSeg = {
-                  BD: {
-                    nombre: 'Brazo Derecho (Miembro Superior)',
-                    musculo: masaBrazosD,
-                    musculoPct: seg.musculoBDPct ?? 105,
-                    grasa: seg.grasaBD ?? 1.30,
-                    evaluacion: '🟢 Masa magra adecuada para empuje, tiro táctico y transporte de armamento militar.',
-                    ejercicio: 'Dominadas con agarre supino, fondos en paralelas y press de banca.',
-                    simetriaVsOpuesto: `${Math.abs(masaBrazosD - masaBrazosI).toFixed(2)} kg de diferencia vs Brazo Izquierdo (Equilibrio bilateral óptimo).`
-                  },
-                  BI: {
-                    nombre: 'Brazo Izquierdo (Miembro Superior)',
-                    musculo: masaBrazosI,
-                    musculoPct: seg.musculoBIPct ?? 104,
-                    grasa: seg.grasaBI ?? 1.28,
-                    evaluacion: '🟢 Excelente tono y simetría bilateral con el brazo dominante.',
-                    ejercicio: 'Flexiones asimétricas, curl unilateral con mancuerna y remo con polea.',
-                    simetriaVsOpuesto: `${Math.abs(masaBrazosD - masaBrazosI).toFixed(2)} kg de diferencia vs Brazo Derecho (Equilibrio bilateral óptimo).`
-                  },
-                  TR: {
-                    nombre: 'Tronco y Zona Media (Core & Columna)',
-                    musculo: masaTronco,
-                    musculoPct: seg.musculoTRPct ?? 105,
-                    grasa: seg.grasaTR ?? 8.50,
-                    evaluacion: '🟢 Núcleo vertebral y caja torácica con densidad muscular sólida para soportar chaleco táctico y carga.',
-                    ejercicio: 'Planchas militares isométricas (2 min), elevación de piernas colgado y peso muerto.',
-                    simetriaVsOpuesto: 'Eje axial central. Proporciona estabilidad y soporte de carga a las cuatro extremidades.'
-                  },
-                  PD: {
-                    nombre: 'Pierna Derecha (Tren Inferior)',
-                    musculo: masaPiernasD,
-                    musculoPct: seg.musculoPDPct ?? 104,
-                    grasa: seg.grasaPD ?? 2.50,
-                    evaluacion: '🟢 Potencia de propulsión y amortiguación para marcha con mochila y zancadas continuas.',
-                    ejercicio: 'Sentadilla búlgara, zancadas tácticas con sobrecarga y prensa inclinada.',
-                    simetriaVsOpuesto: `${Math.abs(masaPiernasD - masaPiernasI).toFixed(2)} kg de diferencia vs Pierna Izquierda (Sin asimetría de riesgo).`
-                  },
-                  PI: {
-                    nombre: 'Pierna Izquierda (Tren Inferior)',
-                    musculo: masaPiernasI,
-                    musculoPct: seg.musculoPIPct ?? 103,
-                    grasa: seg.grasaPI ?? 2.48,
-                    evaluacion: '🟢 Soporte estructural sólido y equilibrio neuromuscular en zancada y saltos.',
-                    ejercicio: 'Sentadilla goblet profunda, saltos pliométricos y subida al banco militar con carga.',
-                    simetriaVsOpuesto: `${Math.abs(masaPiernasD - masaPiernasI).toFixed(2)} kg de diferencia vs Pierna Derecha (Sin asimetría de riesgo).`
-                  }
-                }[segmentoSeleccionado];
-
-                return (
-                  <div className={`mt-3 p-3.5 rounded-2xl border transition-all animate-in fade-in ${
-                    isDark ? 'bg-slate-900/90 border-blue-500/30' : 'bg-blue-50/80 border-blue-200 shadow-sm'
-                  }`}>
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 border-b pb-2 border-slate-700/50 dark:border-slate-800">
-                      <div className="flex items-center gap-2">
-                        <Activity className="w-4 h-4 text-blue-500" />
-                        <span className="text-xs font-black text-blue-600 dark:text-blue-400 uppercase tracking-wider">
-                          Diagnóstico: {infoSeg.nombre}
-                        </span>
-                      </div>
-                      <span className={`text-xs font-mono font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                        {infoSeg.musculo.toFixed(2)} kg músculo ({infoSeg.musculoPct}% estándar) • {infoSeg.grasa.toFixed(2)} kg grasa
-                      </span>
-                    </div>
-                    <p className={`text-xs mt-2 leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                      {infoSeg.evaluacion}
-                    </p>
-                    <div className={`mt-2.5 pt-2 border-t flex flex-col sm:flex-row sm:items-center justify-between text-[11px] gap-2 ${
-                      isDark ? 'border-slate-800 text-slate-400' : 'border-blue-100 text-slate-600'
-                    }`}>
-                      <div>
-                        <strong className="text-blue-500 dark:text-blue-400">Entrenamiento prescrito:</strong> {infoSeg.ejercicio}
-                      </div>
-                      <div className="text-cyan-600 dark:text-cyan-400 font-semibold shrink-0">
-                        {infoSeg.simetriaVsOpuesto}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-
-          </div>
-
-          {/* LADO DERECHO: SOMATOTIPO IDEAL AL QUE DEBERÍA LLEGAR (INCENTIVO MOTIVACIONAL) */}
-          <div className={`lg:col-span-5 border border-cyan-500/30 rounded-3xl p-6 space-y-5 flex flex-col justify-between relative overflow-hidden shadow-xl shadow-cyan-500/5 ${
-            isDark ? 'bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950/40' : 'bg-gradient-to-br from-cyan-50/70 via-white to-blue-50/60'
-          }`}>
-            <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 rounded-full blur-2xl pointer-events-none" />
-
-            <div>
-              <div className={`flex items-center justify-between border-b pb-3 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping" />
-                    <span className="text-[10px] font-black uppercase tracking-wider text-cyan-500 dark:text-cyan-400 block">
-                      🎯 Silueta Meta / Ideal ({selectedGender === 'M' ? 'Masculino' : 'Femenino'})
-                    </span>
-                  </div>
-                  <h3 className={`text-lg font-black mt-0.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                    {somatotipoIdealNombre}
-                  </h3>
-                </div>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-cyan-500/15 text-cyan-600 dark:text-cyan-300 border border-cyan-500/30 shadow-sm">
-                  Meta Militar
-                </span>
-              </div>
-
-              {/* Silueta Ideal e Incentivo */}
-              <div className="flex flex-col sm:flex-row items-center gap-5 py-4">
-                <div 
-                  onClick={() => setModalSomatotipo(defIdeal)}
-                  className={`w-40 h-56 rounded-2xl border-2 border-cyan-500/50 p-2.5 flex items-center justify-center shrink-0 relative overflow-hidden shadow-lg shadow-cyan-500/20 group cursor-pointer hover:border-cyan-400 hover:scale-[1.02] transition-all ${
-                    isDark ? 'bg-slate-950' : 'bg-white'
-                  }`}
-                  title="Haz clic para consultar la ficha médica del somatotipo ideal"
-                >
-                  <img
-                    src={siluetaIdealUrl}
-                    alt={somatotipoIdealNombre}
-                    referrerPolicy="no-referrer"
-                    className="w-full h-full object-contain filter drop-shadow-[0_4px_16px_rgba(6,182,212,0.4)] transition-transform group-hover:scale-105"
-                  />
-                  <span className="absolute bottom-2 left-2 right-2 text-center text-[9px] font-black bg-cyan-950/90 py-1 rounded text-cyan-200 border border-cyan-500/40 group-hover:bg-cyan-600 group-hover:text-white transition-colors">
-                    Ficha Somatotipo Objetivo ({selectedGender})
-                  </span>
-                </div>
-
-                <div className="space-y-3">
-                  <p className={`text-xs leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                    Representa la máxima eficiencia antropométrica: densidad muscular compacta, grasa menor al 16% y protección articular para maniobras de combate.
-                  </p>
-
-                  <div className={`border border-cyan-500/20 p-3 rounded-2xl space-y-2 ${
-                    isDark ? 'bg-slate-900/90' : 'bg-white shadow-sm'
-                  }`}>
-                    <span className="text-[10px] font-black text-cyan-600 dark:text-cyan-400 uppercase tracking-wider block">
-                      Plan de Transformación:
-                    </span>
-                    <div className={`space-y-1.5 text-xs ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
-                      <div className="flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-rose-400 shrink-0" />
-                        <span>
-                          {medActual.controlGrasa < 0 ? `Bajar ${Math.abs(medActual.controlGrasa)} kg de grasa con dieta regional.` : 'Mantener grasa corporal controlada.'}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
-                        <span>
-                          {medActual.controlMuscular > 0 ? `Ganar +${medActual.controlMuscular} kg de músculo con sobrecarga.` : 'Consolidar potencia muscular.'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <button
-              onClick={() => setModalSomatotipo(defIdeal)}
-              className="w-full py-2.5 px-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all shadow-md shadow-cyan-600/30 cursor-pointer text-center"
-            >
-              Consultar Ficha del Somatotipo Ideal
-            </button>
-
-          </div>
-
-        </div>
-      </div>
 
       {/* SECCIÓN 3: MATRIZ DE SOMATOTIPOS — OCULTA POR DEFECTO (solo info) */}
       <div className={`${cardCls} rounded-3xl border shadow-xl transition-colors duration-300 overflow-hidden`}>
