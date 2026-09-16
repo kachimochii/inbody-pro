@@ -1,11 +1,11 @@
 import { UserAccount } from '../types/inbody';
 
-/** Nombre completo unificado (nombres + apellidos si ambos existen en Firestore). */
+/** Nombre completo unificado. */
 export function resolveNombreCompleto(
-  user: Pick<UserAccount, 'nombres' | 'apellidos'>
+  user: Pick<UserAccount, 'nombres'> & { apellidos?: string }
 ): string {
   const n = (user.nombres || '').trim();
-  const a = (user.apellidos || '').trim();
+  const a = (user.apellidos || '').trim(); // legado Firestore (solo lectura)
   if (n && a) return `${n} ${a}`.replace(/\s+/g, ' ').trim();
   return (n || a || 'Sin nombre').replace(/\s+/g, ' ').trim();
 }
@@ -144,7 +144,7 @@ export function resolveGradoTituloLinea(
 
 /** Badge navbar: sigla 4 letras + apellido corto. */
 export function resolveBadgeUsuario(
-  user: Pick<UserAccount, 'grado' | 'unidadActual' | 'nombres' | 'apellidos'>
+  user: Pick<UserAccount, 'grado' | 'unidadActual' | 'nombres'> & { apellidos?: string }
 ): { sigla: string; etiqueta: string; estilo: GradoEstilo } {
   const g = resolveGradoDisplay(user);
   const apellido = extractApellidoCorto(resolveNombreCompleto(user));

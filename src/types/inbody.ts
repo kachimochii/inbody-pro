@@ -56,7 +56,8 @@ export interface InBodyRecord {
   grasaSubcutaneaKg: number;
   adiposidad: number;
   caloriasRecomendadas: number;
-  tipoCuerpo: SomatotipoTipo;
+  /** Calculado en app (no persistir como fuente de verdad). */
+  tipoCuerpo?: SomatotipoTipo;
   edadCorporal: number;
   
   // Rangos de referencia
@@ -81,8 +82,8 @@ export interface InBodyRecord {
 
 export interface UserAccount {
   cedula: string;
+  /** Nombre completo (apellidos + nombres) en una sola variable. */
   nombres: string;
-  apellidos: string;
   grado: string;
   /** Arma / especialidad corta (escalafón). Preferir tituloD si viene lleno. */
   tituloC?: string;

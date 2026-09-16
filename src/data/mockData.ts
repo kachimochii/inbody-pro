@@ -1,5 +1,4 @@
 import { FraseMando, SomatotipoDefinicion, SomatotipoTipo, UserAccount, VideoComplemento, PlanNutricion, PlanEntrenamiento } from '../types/inbody';
-import { EVALUADOS_INBODY_REALES } from './inbodyEvaluados';
 
 export const CAPAS_BASE = {
   fondo: 'https://i.ibb.co/DmTyGbF/FONDO.png',
@@ -144,18 +143,17 @@ export const DEFINICIONES_SOMATOTIPOS: Record<string, SomatotipoDefinicion> = {
 };
 
 export const MOCK_USUARIOS: UserAccount[] = [
-  // Admin institucional (INBODY.csv — TNTE REQUENA VIVANCO JOSE LEONARDO)
+  // Admin institucional
   {
     cedula: '0703887042',
-    nombres: 'JOSE LEONARDO',
-    apellidos: 'REQUENA VIVANCO',
+    nombres: 'REQUENA VIVANCO JOSÉ LEONARDO',
     grado: 'TNTE',
-    especialidad: 'I',
+    tituloC: 'I',
     sexo: 'M',
-    fechaNacimiento: '1993-06-17',
-    fechaIngreso: '2018-08-10',
+    fechaNacimiento: '1990-01-01',
+    fechaIngreso: '2010-01-01',
     tipoUsuario: 'Militar en Servicio Activo',
-    unidadActual: 'ES.FOR.S.FT',
+    unidadActual: '',
     region: 'Sierra',
     role: 'admin',
     rachaDias: 0,
@@ -165,8 +163,7 @@ export const MOCK_USUARIOS: UserAccount[] = [
   // Cuenta demo anterior (depurable) — ya no es admin
   {
     cedula: '1700000001',
-    nombres: 'Carlos Rodrigo',
-    apellidos: 'Proaño Andrade',
+    nombres: 'Proaño Andrade Carlos Rodrigo',
     grado: 'General de Brigada',
     especialidad: 'Comandancia General / Estado Mayor',
     sexo: 'M',
@@ -198,7 +195,6 @@ export const MOCK_USUARIOS: UserAccount[] = [
         grasaSubcutaneaKg: 14.1,
         adiposidad: 104,
         caloriasRecomendadas: 2200,
-        tipoCuerpo: 'Tipo estándar',
         edadCorporal: 47,
         pesoIdeal: 72.0,
         controlPeso: -6.5,
@@ -246,7 +242,6 @@ export const MOCK_USUARIOS: UserAccount[] = [
         grasaSubcutaneaKg: 16.2,
         adiposidad: 112,
         caloriasRecomendadas: 2150,
-        tipoCuerpo: 'Tipo estándar',
         edadCorporal: 50,
         pesoIdeal: 72.0,
         controlPeso: -9.2,
@@ -279,8 +274,7 @@ export const MOCK_USUARIOS: UserAccount[] = [
   },
   {
     cedula: '1700000002',
-    nombres: 'Marcelo Vinicio',
-    apellidos: 'Morales Cevallos',
+    nombres: 'Morales Cevallos Marcelo Vinicio',
     grado: 'Sargento Segundo',
     especialidad: 'Sanidad Militar / Operador Técnico InBody',
     sexo: 'M',
@@ -312,7 +306,6 @@ export const MOCK_USUARIOS: UserAccount[] = [
         grasaSubcutaneaKg: 12.5,
         adiposidad: 102,
         caloriasRecomendadas: 2150,
-        tipoCuerpo: 'Tipo muscular estándar',
         edadCorporal: 35,
         pesoIdeal: 69.5,
         controlPeso: -4.7,
@@ -345,8 +338,7 @@ export const MOCK_USUARIOS: UserAccount[] = [
   },
   {
     cedula: '1700000003',
-    nombres: 'Iván Patricio',
-    apellidos: 'Carrera Montalvo',
+    nombres: 'Carrera Montalvo Iván Patricio',
     grado: 'Suboficial Segundo',
     especialidad: 'Preparación Física Militar / Combate Cercano',
     sexo: 'M',
@@ -378,7 +370,6 @@ export const MOCK_USUARIOS: UserAccount[] = [
         grasaSubcutaneaKg: 8.8,
         adiposidad: 90,
         caloriasRecomendadas: 2800,
-        tipoCuerpo: 'Tipo musculoso magro',
         edadCorporal: 32,
         pesoIdeal: 78.0,
         controlPeso: 3.0,
@@ -411,8 +402,7 @@ export const MOCK_USUARIOS: UserAccount[] = [
   },
   {
     cedula: '1700000004',
-    nombres: 'Valeria Elizabeth',
-    apellidos: 'Silva Narváez',
+    nombres: 'Silva Narváez Valeria Elizabeth',
     grado: 'Capitán Médica',
     especialidad: 'Nutrición Clínica y Alto Rendimiento Táctico',
     sexo: 'F',
@@ -444,7 +434,6 @@ export const MOCK_USUARIOS: UserAccount[] = [
         grasaSubcutaneaKg: 10.8,
         adiposidad: 96,
         caloriasRecomendadas: 1900,
-        tipoCuerpo: 'Tipo muscular estándar',
         edadCorporal: 30,
         pesoIdeal: 58.0,
         controlPeso: 1.4,
@@ -477,8 +466,7 @@ export const MOCK_USUARIOS: UserAccount[] = [
   },
   {
     cedula: '1712345678',
-    nombres: 'Carlos Alberto',
-    apellidos: 'Mendoza Viteri',
+    nombres: 'Mendoza Viteri Carlos Alberto',
     grado: 'Mayor',
     especialidad: 'Infantería / Comandante de Grupo',
     sexo: 'M',
@@ -510,7 +498,6 @@ export const MOCK_USUARIOS: UserAccount[] = [
         grasaSubcutaneaKg: 17.0,
         adiposidad: 114,
         caloriasRecomendadas: 2250,
-        tipoCuerpo: 'Tipo de sobrepeso muscular',
         edadCorporal: 39,
         pesoIdeal: 71.5,
         controlPeso: -10.9,
@@ -558,7 +545,6 @@ export const MOCK_USUARIOS: UserAccount[] = [
         grasaSubcutaneaKg: 20.6,
         adiposidad: 122,
         caloriasRecomendadas: 2210,
-        tipoCuerpo: 'Tipo muscular con sobrepeso',
         edadCorporal: 42,
         pesoIdeal: 71.5,
         controlPeso: -13.6,
@@ -591,8 +577,7 @@ export const MOCK_USUARIOS: UserAccount[] = [
   },
   {
     cedula: '0918273645',
-    nombres: 'Andrea Soledad',
-    apellidos: 'Morales Alarcón',
+    nombres: 'Morales Alarcón Andrea Soledad',
     grado: 'Sargento Primero',
     especialidad: 'Comunicaciones Tácticas',
     sexo: 'F',
@@ -624,7 +609,6 @@ export const MOCK_USUARIOS: UserAccount[] = [
         grasaSubcutaneaKg: 11.2,
         adiposidad: 98,
         caloriasRecomendadas: 1850,
-        tipoCuerpo: 'Tipo muscular estándar',
         edadCorporal: 31,
         pesoIdeal: 57.0,
         controlPeso: 1.2,
@@ -657,8 +641,7 @@ export const MOCK_USUARIOS: UserAccount[] = [
   },
   {
     cedula: '1709876543',
-    nombres: 'Roberto Javier',
-    apellidos: 'Guamán Pacheco',
+    nombres: 'Guamán Pacheco Roberto Javier',
     grado: 'Cabo Segundo',
     especialidad: 'Logística / Transportes',
     sexo: 'M',
@@ -690,7 +673,6 @@ export const MOCK_USUARIOS: UserAccount[] = [
         grasaSubcutaneaKg: 24.3,
         adiposidad: 138,
         caloriasRecomendadas: 1950,
-        tipoCuerpo: 'Falta de tipo de ejercicio',
         edadCorporal: 45,
         pesoIdeal: 68.0,
         controlPeso: -16.5,
@@ -723,8 +705,7 @@ export const MOCK_USUARIOS: UserAccount[] = [
   },
   {
     cedula: '0102030405',
-    nombres: 'Diego Fernando',
-    apellidos: 'Paredes Cárdenas',
+    nombres: 'Paredes Cárdenas Diego Fernando',
     grado: 'Teniente',
     especialidad: 'Comandos / Paracaidismo',
     sexo: 'M',
@@ -756,7 +737,6 @@ export const MOCK_USUARIOS: UserAccount[] = [
         grasaSubcutaneaKg: 8.8,
         adiposidad: 92,
         caloriasRecomendadas: 2750,
-        tipoCuerpo: 'Tipo musculoso desarrollado',
         edadCorporal: 26,
         pesoIdeal: 75.0,
         controlPeso: 2.8,
@@ -789,8 +769,7 @@ export const MOCK_USUARIOS: UserAccount[] = [
   },
   {
     cedula: '1755555555',
-    nombres: 'Juan Carlos',
-    apellidos: 'Guerrero López',
+    nombres: 'Guerrero López Juan Carlos',
     grado: 'Soldado de Infantería',
     especialidad: 'Operaciones Especiales',
     sexo: 'M',
@@ -804,7 +783,6 @@ export const MOCK_USUARIOS: UserAccount[] = [
     misionCompletadaHoy: false,
     mediciones: []
   },
-  ...EVALUADOS_INBODY_REALES
 ];
 
 export const MOCK_VIDEOS: VideoComplemento[] = [

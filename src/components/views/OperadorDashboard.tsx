@@ -239,14 +239,12 @@ export const OperadorDashboard: React.FC<OperadorDashboardProps> = ({
         });
 
         const rawNombre = (row.nombreDetectado || 'Personal Evaluado').replace(row.gradoDetectado || '', '').trim();
-        // Columna "nombres" de plantilla = nombre completo (apellidos + nombres). Una sola variable.
+        // Columna "nombres" de plantilla = nombre completo.
         const nombres = rawNombre || 'Efectivo Militar';
-        const apellidos = '';
 
         const newUser: UserAccount = {
           cedula: row.cedula,
           nombres: nombres,
-          apellidos: apellidos,
           grado: row.gradoDetectado || 'Cabo Segundo',
           tituloC: row.tituloCDetectado || '',
           tituloD: row.tituloDDetectado || '',
@@ -303,7 +301,7 @@ export const OperadorDashboard: React.FC<OperadorDashboardProps> = ({
     });
 
     onAddMeasurementToUser(user.cedula, newRec);
-    setManualMsg(`¡Medición registrada con éxito para ${user.grado} ${user.apellidos}! Score: ${newRec.inbodyScore} pts.`);
+    setManualMsg(`¡Medición registrada con éxito para ${user.grado} ${user.nombres}! Score: ${newRec.inbodyScore} pts.`);
     setManualCedula('');
   };
 

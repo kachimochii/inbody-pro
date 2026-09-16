@@ -222,7 +222,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     return users.filter(u => {
       const matchesSearch =
         u.nombres.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        u.apellidos.toLowerCase().includes(searchTerm.toLowerCase()) ||
         u.cedula.includes(searchTerm) ||
         u.grado.toLowerCase().includes(searchTerm.toLowerCase());
 
@@ -294,7 +293,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       alert('No puede eliminar su propia cuenta de administrador mientras está conectado.');
       return;
     }
-    if (confirm(`¿Eliminar a ${u.grado} ${u.nombres} ${u.apellidos} (${u.cedula})?`)) {
+    if (confirm(`¿Eliminar a ${u.grado} ${u.nombres} (${u.cedula})?`)) {
       onDeleteUser(u.cedula);
     }
   };
@@ -318,7 +317,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </span>
             </h2>
             <p className="text-[11px] text-slate-400 mt-1">
-              Sesión: {currentUser.grado} {currentUser.nombres} {currentUser.apellidos} • CI {currentUser.cedula}
+              Sesión: {currentUser.grado} {currentUser.nombres} • CI {currentUser.cedula}
             </p>
           </div>
 
@@ -827,7 +826,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     return (
                       <tr key={u.cedula} className="hover:bg-slate-850 transition-colors">
                         <td className="p-3.5">
-                          <div className="font-bold text-white">{u.nombres} {u.apellidos}</div>
+                          <div className="font-bold text-white">{u.nombres}</div>
                           <div className="text-[10px] text-blue-400 font-semibold">{u.grado}</div>
                           {isDemoCedula(u.cedula) && (
                             <span className="inline-block mt-1 text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">

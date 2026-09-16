@@ -184,7 +184,7 @@ function MainAppContent() {
         const med = u.mediciones[0];
         return [
           u.cedula,
-          `${u.nombres} ${u.apellidos}`.trim(),
+          u.nombres.trim(),
           u.unidadActual,
           getEstadoInBodyLabel(u),
           med?.inbodyScore ?? '',
@@ -506,8 +506,8 @@ function MainAppContent() {
                     </span>
                     <h3 className={`text-base font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
                       {inspectingUser.cedula === currentUser.cedula
-                        ? `Mi Ficha InBody: ${inspectingUser.grado} ${inspectingUser.nombres} ${inspectingUser.apellidos}`
-                        : `Examinando Ficha InBody: ${inspectingUser.grado} ${inspectingUser.nombres} ${inspectingUser.apellidos}`}
+                        ? `Mi Ficha InBody: ${inspectingUser.grado} ${inspectingUser.nombres}`
+                        : `Examinando Ficha InBody: ${inspectingUser.grado} ${inspectingUser.nombres}`}
                     </h3>
                     <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                       C.I.: {inspectingUser.cedula} • Unidad: {inspectingUser.unidadActual}

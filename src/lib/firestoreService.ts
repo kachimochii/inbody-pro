@@ -17,6 +17,7 @@ import {
   QueryConstraint,
   QueryDocumentSnapshot,
   DocumentData,
+  deleteField,
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage, STORAGE_BUCKET_CANDIDATES, getStorageForBucket } from './firebase';
@@ -39,7 +40,6 @@ import type { FoodCategory, FoodItem, MealData } from '../data/foodDatabase';
 export const FIRESTORE_USER_FIELDS = [
   'cedula',
   'nombres',
-  'apellidos',
   'grado',
   'tituloC',
   'tituloD',
@@ -365,7 +365,7 @@ function toIsoDate(raw: string): string {
 
 export function mapFirestoreUser(cedula: string, data: Record<string, unknown>): UserAccount {
   const id = normalizeCedula(cedula);
-  // Plantilla: columna única "nombres". Si hay apellidos legado, se unen.
+  // Plantilla: columna única "nombres". Si hay apellidos legado, se unen y no se conserva aparte.
   const nombresRaw = String(data.nombres || data.nombre || '').trim();
   const apellidosRaw = String(data.apellidos || '').trim();
   const nombreCompleto =
@@ -394,7 +394,6 @@ export function mapFirestoreUser(cedula: string, data: Record<string, unknown>):
   return {
     cedula: id,
     nombres: nombres || local?.nombres || 'Sin nombre',
-    apellidos: '',
     grado: String(data.grado || local?.grado || ''),
     tituloC: tituloC || undefined,
     tituloD: tituloD || undefined,
@@ -410,6 +409,11 @@ export function mapFirestoreUser(cedula: string, data: Record<string, unknown>):
   };
 }
 
+function sanitizeMedicionForCloud(m: InBodyRecord) {
+  const { tipoCuerpo: _omit, ...rest } = m;
+  return rest;
+}
+
 /** Persiste usuario limpio (solo campos oficiales) en Firestore. */
 export async function saveUserAccountToFirestore(user: UserAccount): Promise<void> {
   const id = normalizeCedula(user.cedula);
@@ -418,7 +422,7 @@ export async function saveUserAccountToFirestore(user: UserAccount): Promise<voi
     {
       cedula: id,
       nombres: user.nombres,
-      apellidos: '',
+      apellidos: deleteField(),
       grado: user.grado,
       tituloC: (user.tituloC || '').trim(),
       tituloD: (user.tituloD || '').trim(),
@@ -429,7 +433,7 @@ export async function saveUserAccountToFirestore(user: UserAccount): Promise<voi
       unidad: user.unidadActual,
       region: user.region,
       role: user.role,
-      mediciones: user.mediciones,
+      mediciones: user.mediciones.map(sanitizeMedicionForCloud),
       updatedAt: new Date().toISOString(),
     },
     { merge: true }
@@ -455,7 +459,14 @@ export async function appendMedicionToFirestore(cedula: string, record: InBodyRe
   const merged = [record, ...withoutExactDup].sort((a, b) =>
     String(b.fecha).localeCompare(String(a.fecha))
   );
-  await setDoc(doc(db, COL_USUARIOS, id), { mediciones: merged, updatedAt: new Date().toISOString() }, { merge: true });
+  await setDoc(
+    doc(db, COL_USUARIOS, id),
+    {
+      mediciones: merged.map(sanitizeMedicionForCloud),
+      updatedAt: new Date().toISOString(),
+    },
+    { merge: true }
+  );
 }
 
 /** Busca UN usuario por cédula (rápido; no descarga 25k). */

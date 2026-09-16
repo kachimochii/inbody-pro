@@ -47,11 +47,11 @@ export const AdminSecurityPanel: React.FC<AdminSecurityPanelProps> = ({ staffUse
       );
 
       for (const u of uniqueStaff) {
-        await ensureCredencial(u.cedula, u.role as UserRole, `${u.nombres} ${u.apellidos}`.trim());
+        await ensureCredencial(u.cedula, u.role as UserRole, u.nombres.trim());
       }
 
       // Asegura admin institucional
-      await ensureCredencial('0703887042', 'admin', 'Admin Institucional');
+      await ensureCredencial('0703887042', 'admin', 'REQUENA VIVANCO JOSÉ LEONARDO');
 
       const [list, seguridad] = await Promise.all([
         listCredencialesPrivilegiadas(),

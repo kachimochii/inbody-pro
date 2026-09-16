@@ -147,7 +147,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ users, onLoginSuccess })
         cred = await ensureCredencial(
           user.cedula,
           user.role,
-          `${user.nombres} ${user.apellidos}`.trim()
+          user.nombres.trim()
         );
       } catch (e) {
         console.error('ensureCredencial', e);
@@ -219,7 +219,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ users, onLoginSuccess })
       await changePassword(pendingUser.cedula, newPass, {
         mustChangePassword: false,
         role: pendingUser.role,
-        nombres: `${pendingUser.nombres} ${pendingUser.apellidos}`.trim(),
+        nombres: pendingUser.nombres.trim(),
       });
       await waitForPhrase(startedAt);
       onLoginSuccess(pendingUser);

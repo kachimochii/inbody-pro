@@ -1651,15 +1651,19 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
               valor: medActual.controlMuscular > 0 ? `Subir ${medActual.controlMuscular} kg` : 'Musculatura Excelente',
               subvalor: `Músculo esquelético actual: ${medActual.musculoKg.toFixed(1)} kg`,
               estado: medActual.controlMuscular > 0 ? 'Meta de Hipertrofia Funcional' : 'Fuerza Consolidada',
-              estadoColor: 'text-blue-400',
+              estadoColor: medActual.controlMuscular > 0 ? 'text-amber-400' : 'text-emerald-400',
               descripcion: 'Muestra los kilogramos de músculo esquelético sugeridos para alcanzar el máximo índice de fuerza y resistencia biomecánica en tareas operacionales.',
               significadoMilitar: 'El músculo esquelético es tu blindaje anatómico. Brinda potencia de tracción para flexiones en barra, estabilidad para disparo táctico y protección ante caídas o impactos.',
               consejo: 'Aplica sobrecarga progresiva en ejercicios multiarticulares (dominadas, flexiones con lastre, sentadillas, peso muerto) y consume al menos 1.8g a 2.0g de proteína por kg de peso corporal al día.'
             })}
             className={`rounded-2xl p-5 space-y-3 border transition-all cursor-pointer group hover:scale-[1.02] ${
-              isDark 
-                ? 'bg-slate-950/80 border-slate-800 hover:border-blue-500/50 hover:shadow-lg hover:shadow-blue-500/5' 
-                : 'bg-slate-50 border-slate-200 hover:border-blue-500 hover:shadow-md'
+              medActual.controlMuscular > 0
+                ? (isDark
+                    ? 'bg-slate-950/80 border-amber-500/40 hover:border-amber-400/60 hover:shadow-lg hover:shadow-amber-500/10'
+                    : 'bg-amber-50/50 border-amber-300 hover:border-amber-400 hover:shadow-md')
+                : (isDark
+                    ? 'bg-slate-950/80 border-slate-800 hover:border-emerald-500/50 hover:shadow-lg hover:shadow-emerald-500/5'
+                    : 'bg-slate-50 border-slate-200 hover:border-emerald-500 hover:shadow-md')
             }`}
             title="Haz clic para consultar la meta de control muscular"
           >
@@ -1667,18 +1671,34 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
                 Control Muscular
               </span>
-              <Info className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-400 transition-colors" />
+              <Info className={`w-3.5 h-3.5 transition-colors ${
+                medActual.controlMuscular > 0 ? 'text-amber-400' : 'text-slate-400 group-hover:text-emerald-400'
+              }`} />
             </div>
-            <div className="text-2xl font-black text-blue-400 font-mono">
-              {medActual.musculoKg.toFixed(1)} kg
+            <div>
+              <div className={`text-2xl font-black font-mono leading-tight ${
+                medActual.controlMuscular > 0 ? 'text-amber-400' : 'text-emerald-400'
+              }`}>
+                {medActual.controlMuscular > 0
+                  ? `Debes subir ${medActual.controlMuscular} kg`
+                  : 'Musculatura en nivel excelente'}
+              </div>
+              <p className={`text-sm font-bold font-mono mt-1 ${
+                medActual.controlMuscular > 0
+                  ? (isDark ? 'text-amber-200/80' : 'text-amber-700')
+                  : (isDark ? 'text-emerald-300/80' : 'text-emerald-700')
+              }`}>
+                Actual: {medActual.musculoKg.toFixed(1)} kg SMM
+              </p>
             </div>
             <p className="text-xs text-slate-400 leading-snug">
-              Musculatura actual (SMM).{' '}
               {medActual.controlMuscular > 0
-                ? `Meta: subir ${medActual.controlMuscular} kg para mayor potencia táctica.`
+                ? `Debes subir ${medActual.controlMuscular} kg en tu musculatura para ganar mayor potencia táctica.`
                 : 'Masa muscular adecuada para tu peso y composición física.'}
             </p>
-            <p className="text-[11px] text-blue-500 dark:text-blue-400 font-semibold pt-1">
+            <p className={`text-[11px] font-semibold pt-1 ${
+              medActual.controlMuscular > 0 ? 'text-amber-500' : 'text-blue-500 dark:text-blue-400'
+            }`}>
               Ver protocolo de hipertrofia militar &rarr;
             </p>
           </div>
