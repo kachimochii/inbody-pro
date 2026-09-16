@@ -52,6 +52,10 @@ export interface AnalisisCorporalInput {
    * Si falta, se asume 100 (sin penalización).
    */
   pctMusculoPiernas?: number;
+  /** % músculo segmental brazos (promedio BD/BI). */
+  pctMusculoBrazos?: number;
+  /** % músculo segmental tronco. */
+  pctMusculoTronco?: number;
   /** InBody Score / puntuación de salud 0–100. */
   puntajeSalud: number;
 }
@@ -66,8 +70,11 @@ export interface AnalisisCorporalResult {
     grasa: number;
     visceral: number;
     seglarPiernas: number;
+    seglarBrazos: number;
+    seglarTronco: number;
     musculo: number;
   };
+  alertasSarcopenia: string[];
   baremoGrasa: { bajo: number; alto: number };
   baremoMusculo: { insuficiente: number; excelente: number };
 }
@@ -167,13 +174,14 @@ function deltaMusculoEfectivo(nivel: NivelIndicador): number {
   return 0.0;
 }
 
-function deltaSeglarPiernas(pctMusculoPiernas: number | undefined): number {
-  const p = safeNum(pctMusculoPiernas, 100);
-  return p < 90 ? 1.5 : 0.0;
+function deltaSeglar(pct: number | undefined, umbral = 90, penalizacion = 1.5): number {
+  const p = safeNum(pct, 100);
+  return p < umbral ? penalizacion : 0.0;
 }
 
 /**
  * Motor principal: somatotipo + edad corporal + coherencia por nivel de salud.
+ * Incluye alerta de sarcopenia / desbalance segmental (brazos, tronco, piernas).
  * No usa valores de edad corporal / InBody Type del equipo: siempre recalcula.
  */
 export function calcularAnalisisCorporal(input: AnalisisCorporalInput): AnalisisCorporalResult {
@@ -183,7 +191,6 @@ export function calcularAnalisisCorporal(input: AnalisisCorporalInput): Analisis
   const pctSMM = safeNum(input.pctSMM, sexo === 'F' ? 35 : 42);
   const visceral = Math.max(1, Math.min(30, Math.round(safeNum(input.grasaVisceral, 5))));
   const puntaje = Math.max(0, Math.min(100, Math.round(safeNum(input.puntajeSalud, 70))));
-  const pctPiernas = input.pctMusculoPiernas;
 
   const baremoG = pickGrasaBaremo(sexo, edad);
   const baremoM = pickMusculoBaremo(sexo, edad);
@@ -195,15 +202,15 @@ export function calcularAnalisisCorporal(input: AnalisisCorporalInput): Analisis
 
   const dG = deltaGrasa(pctGrasa, nivelGrasa, baremoG.alto);
   const dV = deltaVisceral(visceral);
-  const dP = deltaSeglarPiernas(pctPiernas);
+  const dP = deltaSeglar(input.pctMusculoPiernas, 90, 1.5);
+  const dB = deltaSeglar(input.pctMusculoBrazos, 90, 1.0);
+  const dT = deltaSeglar(input.pctMusculoTronco, 90, 1.0);
   const dM = deltaMusculoEfectivo(nivelMusculo);
-  void deltaMusculo; // keep helper referenced for clarity of spec mapping
+  void deltaMusculo;
 
-  // Edad Corporal = Edad Real + ΔGrasa + ΔVisceral + ΔSeglarPiernas + ΔMusculoEfectivo
-  // (ΔMusculoEfectivo ya incorpora signo: BAJO +, ALTO −)
-  let edadCorp = edad + dG + dV + dP + dM;
+  // Edad Corporal = Edad Real + ΔGrasa + ΔVisceral + ΔSeglar (piernas/brazos/tronco) + ΔMusculo
+  let edadCorp = edad + dG + dV + dP + dB + dT + dM;
 
-  // Candados de coherencia por puntaje
   if (nivelSalud === 1) {
     edadCorp = Math.max(edad + 2, edadCorp);
   } else if (nivelSalud === 3) {
@@ -211,6 +218,17 @@ export function calcularAnalisisCorporal(input: AnalisisCorporalInput): Analisis
   }
 
   edadCorp = Math.max(18, Math.round(edadCorp));
+
+  const alertasSarcopenia: string[] = [];
+  if (dP > 0) alertasSarcopenia.push('Piernas con músculo segmental bajo (<90%): riesgo de debilidad / sarcopenia en tren inferior.');
+  if (dB > 0) alertasSarcopenia.push('Brazos con músculo segmental bajo (<90%): menor potencia de tracción y soporte de carga.');
+  if (dT > 0) alertasSarcopenia.push('Tronco/dorso con músculo segmental bajo (<90%): menor estabilidad del core y espalda.');
+  if (nivelMusculo === 'BAJO' && edad >= 50) {
+    alertasSarcopenia.push('Adulto mayor con músculo global bajo: priorizar fuerza progresiva para frenar sarcopenia.');
+  }
+  if (nivelMusculo === 'BAJO' && edad < 35 && pctGrasa > baremoG.alto) {
+    alertasSarcopenia.push('Joven con alto peso graso y bajo músculo: recomposición (fuerza + déficit controlado).');
+  }
 
   return {
     nivelGrasa,
@@ -222,8 +240,11 @@ export function calcularAnalisisCorporal(input: AnalisisCorporalInput): Analisis
       grasa: dG,
       visceral: dV,
       seglarPiernas: dP,
+      seglarBrazos: dB,
+      seglarTronco: dT,
       musculo: dM,
     },
+    alertasSarcopenia,
     baremoGrasa: { bajo: baremoG.bajo, alto: baremoG.alto },
     baremoMusculo: { insuficiente: baremoM.insuficiente, excelente: baremoM.excelente },
   };
@@ -247,4 +268,18 @@ export function pctMusculoPiernasFromSegmental(
   if (Number.isFinite(a)) return a;
   if (Number.isFinite(b)) return b;
   return 100;
+}
+
+/** Promedio % músculo brazos (segmental). */
+export function pctMusculoBrazosFromSegmental(
+  pctBrazoD?: number,
+  pctBrazoI?: number
+): number {
+  return pctMusculoPiernasFromSegmental(pctBrazoD, pctBrazoI);
+}
+
+/** % músculo tronco (segmental). */
+export function pctMusculoTroncoFromSegmental(pctTronco?: number): number {
+  const t = safeNum(pctTronco, NaN);
+  return Number.isFinite(t) ? t : 100;
 }

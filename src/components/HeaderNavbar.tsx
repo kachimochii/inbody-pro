@@ -2,6 +2,9 @@ import React from 'react';
 import { UserAccount, UserRole } from '../types/inbody';
 import { useTheme } from '../context/ThemeContext';
 import { BrandLogo } from './BrandLogo';
+import {
+  resolveBadgeUsuario,
+} from '../utils/militarDisplay';
 import { 
   Shield, 
   Activity, 
@@ -186,17 +189,36 @@ export const HeaderNavbar: React.FC<HeaderNavbarProps> = ({
             <div className={`flex items-center gap-2.5 border rounded-xl px-3.5 py-1.5 ${
               isDark ? 'bg-slate-800/70 border-slate-700/60' : 'bg-slate-100/90 border-slate-200'
             }`}>
-              <div className="w-7 h-7 rounded-lg bg-blue-500/20 text-blue-500 flex items-center justify-center font-bold text-xs">
-                {currentUser.grado.substring(0, 3)}
-              </div>
-              <div className="text-left">
-                <p className={`text-xs font-bold leading-tight truncate max-w-[150px] ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                  {currentUser.grado} {currentUser.apellidos.split(' ')[0]}
-                </p>
-                <p className={`text-[10px] font-mono leading-tight ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                  CI: {currentUser.cedula}
-                </p>
-              </div>
+              {(() => {
+                const badge = resolveBadgeUsuario(currentUser);
+                const estiloBadge =
+                  badge.estilo === 'oro'
+                    ? 'bg-amber-500/25 text-amber-300'
+                    : badge.estilo === 'plata'
+                      ? 'bg-slate-300/20 text-slate-100'
+                      : 'bg-blue-500/20 text-blue-500';
+                return (
+                  <>
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-[10px] tracking-tight ${estiloBadge}`}>
+                      {badge.sigla}
+                    </div>
+                    <div className="text-left">
+                      <p className={`text-xs font-bold leading-tight truncate max-w-[180px] ${
+                        badge.estilo === 'oro'
+                          ? 'text-amber-300'
+                          : badge.estilo === 'plata'
+                            ? (isDark ? 'text-slate-100' : 'text-slate-700')
+                            : (isDark ? 'text-white' : 'text-slate-900')
+                      }`}>
+                        {badge.etiqueta}
+                      </p>
+                      <p className={`text-[10px] font-mono leading-tight ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                        CI: {currentUser.cedula}
+                      </p>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
 
             {/* Botón Cerrar Sesión / Cambiar Cédula */}

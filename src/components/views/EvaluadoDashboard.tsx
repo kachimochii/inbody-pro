@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserAccount, SomatotipoDefinicion, SomatotipoTipo, PlanNutricion, PlanEntrenamiento, RegionEcuador, resolveTituloArma } from '../../types/inbody';
+import { UserAccount, SomatotipoDefinicion, SomatotipoTipo, PlanNutricion, PlanEntrenamiento, RegionEcuador } from '../../types/inbody';
 import { 
   DEFINICIONES_SOMATOTIPOS, 
   CAPAS_BASE, 
@@ -14,6 +14,12 @@ import {
   extractYoutubeVideoId,
   resolveTipoCuerpo,
 } from '../../utils/inbodyCalculations';
+import {
+  resolveNombreCompleto,
+  resolveGradoTituloLinea,
+  resolveBadgeUsuario,
+  claseEstiloGrado,
+} from '../../utils/militarDisplay';
 import { SomatotipoModal } from '../SomatotipoModal';
 import { GuiaInbodyModal } from '../GuiaInbodyModal';
 import { EdadCorporalCard } from '../EdadCorporalCard';
@@ -131,6 +137,9 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
   const medActual = user.mediciones[safeMedIndex];
   const medAnterior = user.mediciones[safeMedIndex + 1]; // la toma previa a la seleccionada (si existe)
   const medMasReciente = user.mediciones[0];
+  const nombreCompleto = resolveNombreCompleto(user);
+  const gradoLinea = resolveGradoTituloLinea(user);
+  const badgeUser = resolveBadgeUsuario(user);
 
   if (!medActual) {
     return (
@@ -160,7 +169,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
         }`}>
           <div className="flex justify-between border-b border-slate-800/40 dark:border-slate-800 pb-2">
             <span className="font-bold">Efectivo Militar:</span>
-            <span>{user.grado} {user.nombres} {user.apellidos}</span>
+            <span>{gradoLinea.linea} · {nombreCompleto}</span>
           </div>
           <div className="flex justify-between border-b border-slate-800/40 dark:border-slate-800 pb-2">
             <span className="font-bold">Cédula de Identidad:</span>
@@ -220,8 +229,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
 
   const medallaUrl = `/medallas/n${nivelNumero}.png`;
   const soldadoUrl = `/medallas/s${nivelNumero}.png`;
-  const primerApellido = (user.apellidos || '').trim().split(/\s+/)[0] || '';
-  const etiquetaMedallaNivel3 = `${(user.grado || '').trim()} ${primerApellido}`.trim().toUpperCase();
+  const etiquetaMedallaNivel3 = badgeUser.etiqueta;
   const scoreBarPct = Math.min(100, Math.max(4, score));
 
   // Somatotipo actual y definición con selección de silueta según género
@@ -289,43 +297,42 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
     return 'Bajo';
   };
 
-  // Filtrado de planes para el evaluado
-  // Planes de nutrición por somatotipo y región
-  const planesNutricionUsuario = planesNutricion.filter(
-    p => p.region === selectedRegion && (p.somatotipo === somatotipoActual || p.somatotipo === 'Tipo estándar')
-  );
-  const planNutricionPrincipal = planesNutricionUsuario[0] || planesNutricion[0];
+  // Filtrado estricto: somatotipo + rango de edad (ficha) + sexo
+  const sexoUser = String(user.sexo || 'M').toUpperCase().startsWith('F') ? 'F' : 'M';
+  const matchPlanDestino = (p: PlanEntrenamiento) => {
+    const sexoOk =
+      !p.sexoDestino ||
+      p.sexoDestino === 'TODOS' ||
+      String(p.sexoDestino).toUpperCase() === sexoUser;
+    const edadOk =
+      (p.rangoEdadMin ?? 0) <= edad &&
+      (p.rangoEdadMax ?? 120) >= edad;
+    const somatoOk =
+      String(p.somatotipo || '').trim().toLowerCase() ===
+      String(somatotipoActual || '').trim().toLowerCase();
+    return sexoOk && edadOk && somatoOk;
+  };
 
-  // Determinación de la ficha de edad del usuario (etiqueta informativa)
+  const planesEntrenamientoUsuario = planesEntrenamiento.filter(matchPlanDestino);
+
   let fichaEdadSugerida = 'Ficha 1 (20 a 30 años)';
   if (edad > 50) fichaEdadSugerida = 'Ficha 4 (Mayor a 50 años)';
   else if (edad > 40) fichaEdadSugerida = 'Ficha 3 (41 a 50 años)';
   else if (edad > 30) fichaEdadSugerida = 'Ficha 2 (31 a 40 años)';
 
-  // Planes compatibles: somatotipo + rango edad + sexo (TODOS o del usuario)
-  // Prioriza somatotipo exacto; si no hay, incluye Tipo estándar como fallback
-  const planesPorSomatotipoExacto = planesEntrenamiento.filter(
-    p =>
-      p.somatotipo === somatotipoActual &&
-      p.rangoEdadMin <= edad &&
-      p.rangoEdadMax >= edad &&
-      ((p.sexoDestino || 'TODOS') === 'TODOS' || p.sexoDestino === user.sexo)
+  const planesNutricionUsuario = planesNutricion.filter(
+    (p) =>
+      p.region === selectedRegion &&
+      (String(p.somatotipo || '').trim().toLowerCase() ===
+        String(somatotipoActual || '').trim().toLowerCase() ||
+        p.somatotipo === 'Tipo estándar')
   );
-  const planesEntrenamientoUsuario =
-    planesPorSomatotipoExacto.length > 0
-      ? planesPorSomatotipoExacto
-      : planesEntrenamiento.filter(
-          p =>
-            p.somatotipo === 'Tipo estándar' &&
-            p.rangoEdadMin <= edad &&
-            p.rangoEdadMax >= edad &&
-            ((p.sexoDestino || 'TODOS') === 'TODOS' || p.sexoDestino === user.sexo)
-        );
+  const planNutricionPrincipal = planesNutricionUsuario[0] || planesNutricion[0];
 
   const planEntrenamientoPrincipal =
     planesEntrenamientoUsuario.find(p => p.id === planEntrenoSeleccionadoId) ||
     planesEntrenamientoUsuario[0] ||
-    planesEntrenamiento[0];
+    null;
 
   const cerrarModalEntrenamiento = () => {
     setModalEntrenamientoAbierto(false);
@@ -338,7 +345,6 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
   const nombreUnidadLargo = getNombreCompletoUnidad(user.unidadActual);
   const provinciaUnidad = getProvinciaUnidad(user.unidadActual);
   const regionUnidad = getRegionUnidad(user.unidadActual);
-  const tituloArma = resolveTituloArma(user);
 
   return (
     <div className="space-y-8 pb-16">
@@ -364,10 +370,8 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
-              <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${
-                isDark ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'bg-blue-50 text-blue-700 border border-blue-200'
-              }`}>
-                {user.grado}{tituloArma ? ` ${tituloArma}` : ''}
+              <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border ${claseEstiloGrado(gradoLinea.estilo, isDark)}`}>
+                {gradoLinea.linea}
               </span>
               <span className={`px-3 py-1 rounded-full text-xs font-bold border ${
                 isDark ? 'bg-slate-950 text-slate-300 border-slate-800' : 'bg-slate-100 text-slate-700 border-slate-200'
@@ -394,7 +398,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
             </div>
 
             <h1 className={`text-2xl sm:text-3xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
-              {user.nombres} {user.apellidos}
+              {nombreCompleto}
             </h1>
 
             {(nombreUnidadLargo || provinciaUnidad || regionUnidad) && (
@@ -1267,12 +1271,18 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
           <div className={`${cardCls} rounded-3xl border overflow-hidden shadow-xl flex flex-col justify-between transition-all group`}>
             <div>
               <div className="relative h-48 w-full overflow-hidden bg-slate-950">
-                <img
-                  src={planEntrenamientoPrincipal.portadaUrl || planEntrenamientoPrincipal.imagenUrl}
-                  alt={planEntrenamientoPrincipal.nombre}
-                  referrerPolicy="no-referrer"
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                />
+                {planEntrenamientoPrincipal ? (
+                  <img
+                    src={planEntrenamientoPrincipal.portadaUrl || planEntrenamientoPrincipal.imagenUrl}
+                    alt={planEntrenamientoPrincipal.nombre}
+                    referrerPolicy="no-referrer"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-slate-500 text-xs font-bold px-4 text-center">
+                    Sin plan para {somatotipoActual} · {fichaEdadSugerida} · {sexoUser}
+                  </div>
+                )}
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-black/40" />
 
                 <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
@@ -1284,23 +1294,26 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
                   </span>
                 </div>
 
-                <div className="absolute bottom-3 left-3 right-3">
-                  <span className="text-xs font-bold text-white bg-slate-900/90 px-3 py-1 rounded-xl border border-slate-700/80 backdrop-blur">
-                    {planEntrenamientoPrincipal.diasPorSemana || 4} sesiones por semana
-                  </span>
-                </div>
+                {planEntrenamientoPrincipal && (
+                  <div className="absolute bottom-3 left-3 right-3">
+                    <span className="text-xs font-bold text-white bg-slate-900/90 px-3 py-1 rounded-xl border border-slate-700/80 backdrop-blur">
+                      {planEntrenamientoPrincipal.diasPorSemana || 4} sesiones por semana
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="p-6 space-y-3">
                 <h3 className={`text-lg font-black leading-snug group-hover:text-blue-500 transition-colors ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                  {planEntrenamientoPrincipal.nombre}
+                  {planEntrenamientoPrincipal?.nombre || 'Sin plan publicado para tu perfil'}
                 </h3>
 
-                <p className={`text-xs leading-relaxed line-clamp-2 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                  {planEntrenamientoPrincipal.descripcion}
+                <p className={`text-xs leading-relaxed line-clamp-3 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                  {planEntrenamientoPrincipal?.descripcion ||
+                    `No hay planes de entrenamiento para ${somatotipoActual}, ${fichaEdadSugerida} y sexo ${sexoUser === 'F' ? 'Femenino' : 'Masculino'}. El entrenador debe crear un plan con ese somatotipo, ficha y sexo.`}
                 </p>
 
-                {planEntrenamientoPrincipal.ejerciciosClave && (
+                {planEntrenamientoPrincipal?.ejerciciosClave && (
                   <div className={`pt-2 border-t space-y-1 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
                       Ejercicios destacados:
@@ -1332,9 +1345,10 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
                   setAudioMuted(false);
                   setModalEntrenamientoAbierto(true);
                 }}
-                className="w-full py-3 px-5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-blue-600/30 transition-all cursor-pointer"
+                disabled={!planEntrenamientoPrincipal}
+                className="w-full py-3 px-5 rounded-2xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-blue-600/30 transition-all cursor-pointer"
               >
-                <span>Abrir Plan de Entrenamiento</span>
+                <span>{planEntrenamientoPrincipal ? 'Abrir Plan de Entrenamiento' : 'Sin plan disponible'}</span>
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
@@ -1656,13 +1670,12 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
               <Info className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-400 transition-colors" />
             </div>
             <div className="text-2xl font-black text-blue-400 font-mono">
-              {medActual.controlMuscular > 0 
-                ? `Debes subir ${medActual.controlMuscular} kg` 
-                : 'Musculatura en nivel excelente'}
+              {medActual.musculoKg.toFixed(1)} kg
             </div>
             <p className="text-xs text-slate-400 leading-snug">
-              {medActual.controlMuscular > 0 
-                ? `Debes subir ${medActual.controlMuscular} kg en tu musculatura para ganar mayor potencia táctica.` 
+              Musculatura actual (SMM).{' '}
+              {medActual.controlMuscular > 0
+                ? `Meta: subir ${medActual.controlMuscular} kg para mayor potencia táctica.`
                 : 'Masa muscular adecuada para tu peso y composición física.'}
             </p>
             <p className="text-[11px] text-blue-500 dark:text-blue-400 font-semibold pt-1">

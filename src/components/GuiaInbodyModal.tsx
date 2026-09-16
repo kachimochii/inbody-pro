@@ -9,7 +9,7 @@ interface GuiaInbodyModalProps {
 
 export const GuiaInbodyModal: React.FC<GuiaInbodyModalProps> = ({ isOpen, onClose }) => {
   const [generoGuia, setGeneroGuia] = useState<'M' | 'F'>('M');
-  const [tabActiva, setTabActiva] = useState<'semaforo' | 'somatotipos' | 'segmental' | 'planes'>('semaforo');
+  const [tabActiva, setTabActiva] = useState<'semaforo' | 'somatotipos' | 'segmental' | 'edad' | 'planes'>('semaforo');
 
   if (!isOpen) return null;
 
@@ -102,6 +102,17 @@ export const GuiaInbodyModal: React.FC<GuiaInbodyModalProps> = ({ isOpen, onClos
             <span>3. Análisis de 5 Cilindros & Visceral</span>
           </button>
           <button
+            onClick={() => setTabActiva('edad')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
+              tabActiva === 'edad'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Heart className="w-4 h-4" />
+            <span>4. Edad Corporal</span>
+          </button>
+          <button
             onClick={() => setTabActiva('planes')}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
               tabActiva === 'planes'
@@ -110,7 +121,7 @@ export const GuiaInbodyModal: React.FC<GuiaInbodyModalProps> = ({ isOpen, onClos
             }`}
           >
             <Salad className="w-4 h-4" />
-            <span>4. Nutrición Regional & Fichas de Edad</span>
+            <span>5. Nutrición Regional & Fichas de Edad</span>
           </button>
         </div>
 
@@ -418,12 +429,74 @@ export const GuiaInbodyModal: React.FC<GuiaInbodyModalProps> = ({ isOpen, onClos
             </section>
           )}
 
-          {/* TAB 4: PLANES REGIONALES Y FICHAS DE EDAD */}
+          {/* TAB 4: EDAD CORPORAL */}
+          {(tabActiva === 'edad' || typeof window !== 'undefined') && (
+            <section className={`space-y-6 ${tabActiva !== 'edad' ? 'hidden print:block' : 'block'}`}>
+              <div className="border-b border-slate-800 pb-3">
+                <span className="text-xs font-black uppercase tracking-wider text-cyan-400">
+                  Capítulo IV • Biomarcador de Juventud
+                </span>
+                <h3 className="text-lg sm:text-xl font-black text-white mt-1">
+                  Cómo se calcula la Edad Corporal (automática)
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  No usa la edad que imprime el equipo InBody. Se recalcula con tu edad real, composición y segmentos.
+                </p>
+              </div>
+
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-5 space-y-3 text-xs text-slate-300 leading-relaxed">
+                <p className="font-black text-white text-sm">Fórmula institucional</p>
+                <p className="font-mono text-cyan-300 text-[11px]">
+                  Edad corporal = Edad real + ΔGrasa + ΔVisceral + ΔPiernas + ΔBrazos + ΔTronco + ΔMúsculo
+                </p>
+                <ul className="space-y-2 list-disc pl-4">
+                  <li>
+                    <strong className="text-white">ΔGrasa:</strong> si tu % grasa supera el techo de tu sexo/edad, suma años
+                    (aprox. +1.5 por cada 2 puntos sobre el límite). Si estás muy magro, resta hasta 2 años.
+                  </li>
+                  <li>
+                    <strong className="text-white">ΔVisceral:</strong> nivel ≥10 suma +3 años; nivel ≥13 suma +6 años (grasa profunda).
+                  </li>
+                  <li>
+                    <strong className="text-white">ΔMúsculo (SMM):</strong> músculo bajo penaliza +3 años; músculo alto bonifica −3 años.
+                  </li>
+                  <li>
+                    <strong className="text-white">ΔSegmental (sarcopenia / desbalance):</strong> si brazos, tronco o piernas están
+                    bajo el 90% del músculo segmental esperado, suma años (piernas +1.5; brazos o dorso +1 cada uno).
+                    Por eso un adulto mayor con piernas débiles o un joven con mucho peso y poco músculo puede “envejecer” en la ficha.
+                  </li>
+                  <li>
+                    <strong className="text-white">Candado por Nivel de salud:</strong> Nivel 1 (score &lt;70) no permite quedar
+                    más joven que edad+2. Nivel 3 (score ≥85) no permite quedar peor que edad−2.
+                  </li>
+                </ul>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 space-y-2">
+                  <p className="font-black text-emerald-400">¿Por qué me BAJAN los años?</p>
+                  <p className="text-slate-300">
+                    Buena masa muscular, grasa controlada, visceral baja y segmentos (brazos/tronco/piernas) equilibrados.
+                    El cuerpo rinde como alguien más joven.
+                  </p>
+                </div>
+                <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-4 space-y-2">
+                  <p className="font-black text-rose-400">¿Por qué me SUBEN los años?</p>
+                  <p className="text-slate-300">
+                    Exceso de grasa o visceral, músculo insuficiente, o segmentos bajos (típico de sarcopenia en adultos mayores
+                    o de “peso alto / músculo bajo” en jóvenes). Entrena fuerza y mejora la nutrición para revertirlo.
+                  </p>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* TAB 5: PLANES REGIONALES Y FICHAS DE EDAD */}
           {(tabActiva === 'planes' || typeof window !== 'undefined') && (
             <section className={`space-y-6 ${tabActiva !== 'planes' ? 'hidden print:block' : 'block'}`}>
               <div className="border-b border-slate-800 pb-3">
                 <span className="text-xs font-black uppercase tracking-wider text-emerald-400">
-                  Capítulo IV • Prescripción Operativa
+                  Capítulo V • Prescripción Operativa
                 </span>
                 <h3 className="text-lg sm:text-xl font-black text-white mt-1">
                   Estructura de Planes por Región Geográfica y Fichas de Edad

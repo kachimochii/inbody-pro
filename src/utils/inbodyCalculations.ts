@@ -3,6 +3,8 @@ import {
   calcularAnalisisCorporal,
   getNivelSalud,
   pctMusculoPiernasFromSegmental,
+  pctMusculoBrazosFromSegmental,
+  pctMusculoTroncoFromSegmental,
   pctSmmFromKg,
 } from './composicionCorporal';
 
@@ -48,6 +50,8 @@ export interface BiologicalAgeParams {
   adiposidad?: number;
   pctSMM?: number;
   pctMusculoPiernas?: number;
+  pctMusculoBrazos?: number;
+  pctMusculoTronco?: number;
   musculoKg?: number;
   pesoKg?: number;
 }
@@ -80,6 +84,8 @@ export function calculateBiologicalAge(
     pctSMM,
     grasaVisceral: p.grasaVisceral ?? 5,
     pctMusculoPiernas: p.pctMusculoPiernas,
+    pctMusculoBrazos: p.pctMusculoBrazos,
+    pctMusculoTronco: p.pctMusculoTronco,
     puntajeSalud: p.score,
   }).edadCorporal;
 }
@@ -104,16 +110,24 @@ export function resolveEdadCorporal(
       medicion.segmental?.musculoPDPct,
       medicion.segmental?.musculoPIPct
     ),
+    pctMusculoBrazos: pctMusculoBrazosFromSegmental(
+      medicion.segmental?.musculoBDPct,
+      medicion.segmental?.musculoBIPct
+    ),
+    pctMusculoTronco: pctMusculoTroncoFromSegmental(medicion.segmental?.musculoTRPct),
     puntajeSalud: medicion.inbodyScore,
   }).edadCorporal;
 }
 
-/** Somatotipo automático (ignora InBody Type del CSV). */
-export function resolveTipoCuerpo(
-  medicion: Pick<InBodyRecord, 'pctGrasa' | 'grasaVisceral' | 'musculoKg' | 'peso' | 'inbodyScore' | 'segmental'>,
+/** Análisis completo (edad + sarcopenia segmental + somatotipo). */
+export function resolveAnalisisCorporal(
+  medicion: Pick<
+    InBodyRecord,
+    'inbodyScore' | 'pctGrasa' | 'grasaVisceral' | 'musculoKg' | 'peso' | 'segmental'
+  >,
   edadCronologica: number,
   sexo: Sexo = 'M'
-): SomatotipoTipo {
+) {
   return calcularAnalisisCorporal({
     edad: edadCronologica,
     sexo,
@@ -124,8 +138,22 @@ export function resolveTipoCuerpo(
       medicion.segmental?.musculoPDPct,
       medicion.segmental?.musculoPIPct
     ),
+    pctMusculoBrazos: pctMusculoBrazosFromSegmental(
+      medicion.segmental?.musculoBDPct,
+      medicion.segmental?.musculoBIPct
+    ),
+    pctMusculoTronco: pctMusculoTroncoFromSegmental(medicion.segmental?.musculoTRPct),
     puntajeSalud: medicion.inbodyScore,
-  }).tipoCuerpo;
+  });
+}
+
+/** Somatotipo automático (ignora InBody Type del CSV). */
+export function resolveTipoCuerpo(
+  medicion: Pick<InBodyRecord, 'pctGrasa' | 'grasaVisceral' | 'musculoKg' | 'peso' | 'inbodyScore' | 'segmental'>,
+  edadCronologica: number,
+  sexo: Sexo = 'M'
+): SomatotipoTipo {
+  return resolveAnalisisCorporal(medicion, edadCronologica, sexo).tipoCuerpo;
 }
 
 export function calculateTickPosition(

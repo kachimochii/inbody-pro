@@ -239,17 +239,17 @@ export const OperadorDashboard: React.FC<OperadorDashboardProps> = ({
         });
 
         const rawNombre = (row.nombreDetectado || 'Personal Evaluado').replace(row.gradoDetectado || '', '').trim();
-        const nombresArr = rawNombre.split(' ');
-        const nombres = nombresArr.slice(0, Math.min(2, nombresArr.length)).join(' ') || 'Efectivo';
-        const apellidos = row.apellidosDetectados || nombresArr.slice(2).join(' ') || 'Militar';
+        // Columna "nombres" de plantilla = nombre completo (apellidos + nombres). Una sola variable.
+        const nombres = rawNombre || 'Efectivo Militar';
+        const apellidos = '';
 
         const newUser: UserAccount = {
           cedula: row.cedula,
           nombres: nombres,
           apellidos: apellidos,
           grado: row.gradoDetectado || 'Cabo Segundo',
-          tituloC: '',
-          tituloD: '',
+          tituloC: row.tituloCDetectado || '',
+          tituloD: row.tituloDDetectado || '',
           sexo: row.sexoDetectado || 'M',
           fechaNacimiento: row.fechaNacimientoDetectada || '1998-06-15',
           fechaIngreso: row.fechaIngresoDetectada || '2020-03-01',
@@ -327,7 +327,7 @@ export const OperadorDashboard: React.FC<OperadorDashboardProps> = ({
               Ingesta y Procesamiento de Mediciones
             </h2>
             <p className="text-xs text-slate-400 mt-0.5 max-w-2xl">
-              Carga el archivo Excel/CSV exportado de la máquina InBody 270S o utiliza la plantilla guía oficial para sincronizar automáticamente los resultados con los expedientes militares por cédula.
+              Carga el CSV exportado de LookinBody (mismo formato que INBODY 1.csv) o descarga la plantilla oficial. Misma cédula en otra fecha = nueva medición en el historial (2.ª, 3.ª…). Edad corporal y somatotipo los calcula la app automáticamente.
             </p>
           </div>
 

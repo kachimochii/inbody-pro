@@ -365,10 +365,15 @@ function toIsoDate(raw: string): string {
 
 export function mapFirestoreUser(cedula: string, data: Record<string, unknown>): UserAccount {
   const id = normalizeCedula(cedula);
-  const fullName = String(data.nombres || data.nombre || '');
-  const { nombres, apellidos } = data.apellidos
-    ? { nombres: fullName, apellidos: String(data.apellidos) }
-    : splitNombres(fullName);
+  // Plantilla: columna única "nombres". Si hay apellidos legado, se unen.
+  const nombresRaw = String(data.nombres || data.nombre || '').trim();
+  const apellidosRaw = String(data.apellidos || '').trim();
+  const nombreCompleto =
+    nombresRaw && apellidosRaw
+      ? `${nombresRaw} ${apellidosRaw}`.replace(/\s+/g, ' ').trim()
+      : nombresRaw || apellidosRaw || '';
+  const nombres = nombreCompleto || 'Sin nombre';
+  void splitNombres;
 
   const sexoRaw = String(data.sexo || 'M').toUpperCase();
   const roleRaw = String(data.role || data.rol || 'usuario').toLowerCase();
@@ -389,7 +394,7 @@ export function mapFirestoreUser(cedula: string, data: Record<string, unknown>):
   return {
     cedula: id,
     nombres: nombres || local?.nombres || 'Sin nombre',
-    apellidos: apellidos || local?.apellidos || '',
+    apellidos: '',
     grado: String(data.grado || local?.grado || ''),
     tituloC: tituloC || undefined,
     tituloD: tituloD || undefined,
@@ -413,7 +418,7 @@ export async function saveUserAccountToFirestore(user: UserAccount): Promise<voi
     {
       cedula: id,
       nombres: user.nombres,
-      apellidos: user.apellidos,
+      apellidos: '',
       grado: user.grado,
       tituloC: (user.tituloC || '').trim(),
       tituloD: (user.tituloD || '').trim(),

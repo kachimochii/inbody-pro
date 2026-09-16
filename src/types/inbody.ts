@@ -104,7 +104,7 @@ export interface UserAccount {
   misionCompletadaHoy?: boolean;
 }
 
-/** Preferencia: tituloD si no está vacío; si no, tituloC; si no, especialidad legado. */
+/** Preferencia: tituloD si no está vacío; si no, tituloC; si no, especialidad legado. Nunca concatena ambos. */
 export function resolveTituloArma(user: Pick<UserAccount, 'tituloC' | 'tituloD' | 'especialidad'>): string {
   const d = (user.tituloD || '').trim();
   if (d) return d;

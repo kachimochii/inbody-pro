@@ -1,5 +1,6 @@
 import React from 'react';
-import { InBodyRecord } from '../types/inbody';
+import { InBodyRecord, Sexo } from '../types/inbody';
+import { resolveAnalisisCorporal } from '../utils/inbodyCalculations';
 import { useTheme } from '../context/ThemeContext';
 import {
   Zap,
@@ -13,23 +14,24 @@ import {
   Dumbbell,
   ShieldCheck,
   Timer,
+  AlertTriangle,
 } from 'lucide-react';
 
 interface EdadCorporalCardProps {
   medicion: InBodyRecord;
   edadCronologica: number;
+  sexo?: Sexo;
 }
 
 export const EdadCorporalCard: React.FC<EdadCorporalCardProps> = ({
   medicion,
   edadCronologica,
+  sexo = 'M' as Sexo,
 }) => {
   const { isDark } = useTheme();
 
-  const edadCorp =
-    medicion.edadCorporal && medicion.edadCorporal > 0
-      ? medicion.edadCorporal
-      : Math.max(18, Math.round(edadCronologica - (medicion.inbodyScore - 74) / 2.5));
+  const analisis = resolveAnalisisCorporal(medicion, edadCronologica, sexo);
+  const edadCorp = analisis.edadCorporal;
 
   const diferencia = edadCorp - edadCronologica;
   const esMasJoven = diferencia < 0;
@@ -112,6 +114,9 @@ export const EdadCorporalCard: React.FC<EdadCorporalCardProps> = ({
             <h3 className={`text-xl sm:text-2xl font-black mt-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>
               Edad Corporal vs. Edad Cronológica
             </h3>
+            <p className={`text-[10px] mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+              Calculada automáticamente (grasa, visceral, músculo, piernas y nivel de salud). No usa edad del equipo.
+            </p>
           </div>
         </div>
 
@@ -276,6 +281,22 @@ export const EdadCorporalCard: React.FC<EdadCorporalCardProps> = ({
               </span>
             </div>
           </div>
+
+          {analisis.alertasSarcopenia.length > 0 && (
+            <div className={`mt-3 p-3 rounded-xl border space-y-1.5 ${
+              isDark ? 'bg-amber-500/10 border-amber-500/30' : 'bg-amber-50 border-amber-200'
+            }`}>
+              <div className="flex items-center gap-1.5 text-amber-400 text-[10px] font-black uppercase tracking-wider">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                Segmental / sarcopenia
+              </div>
+              {analisis.alertasSarcopenia.map((a, i) => (
+                <p key={i} className={`text-[10px] leading-snug ${isDark ? 'text-amber-100/90' : 'text-amber-900'}`}>
+                  • {a}
+                </p>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
