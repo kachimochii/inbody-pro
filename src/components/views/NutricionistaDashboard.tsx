@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { SomatotipoTipo, RegionEcuador, PlanNutricion } from '../../types/inbody';
 import { DEFINICIONES_SOMATOTIPOS, GALERIA_PLATOS_ECUADOR } from '../../data/mockData';
+import { FoodItem } from '../../data/foodDatabase';
+import { AlimentosCalculadoraManager } from '../AlimentosCalculadoraManager';
 import { 
   Salad, 
   Plus, 
@@ -13,7 +15,8 @@ import {
   X,
   Filter,
   Sparkles,
-  Copy
+  Copy,
+  Calculator
 } from 'lucide-react';
 
 interface NutricionistaDashboardProps {
@@ -22,6 +25,10 @@ interface NutricionistaDashboardProps {
   onUpdatePlan: (plan: PlanNutricion) => void;
   onDeletePlan: (id: string) => void;
   isAdminMode?: boolean;
+  alimentos?: FoodItem[];
+  onAddAlimento?: (item: FoodItem) => void;
+  onUpdateAlimento?: (item: FoodItem) => void;
+  onDeleteAlimento?: (id: string) => void;
 }
 
 export const NutricionistaDashboard: React.FC<NutricionistaDashboardProps> = ({
@@ -29,8 +36,13 @@ export const NutricionistaDashboard: React.FC<NutricionistaDashboardProps> = ({
   onAddPlan,
   onUpdatePlan,
   onDeletePlan,
-  isAdminMode = false
+  isAdminMode = false,
+  alimentos = [],
+  onAddAlimento,
+  onUpdateAlimento,
+  onDeleteAlimento,
 }) => {
+  const [nutriTab, setNutriTab] = useState<'platos' | 'calculadora'>('platos');
   const [selectedSomatotipo, setSelectedSomatotipo] = useState<SomatotipoTipo | 'TODOS'>('TODOS');
   const [selectedRegion, setSelectedRegion] = useState<RegionEcuador | 'TODAS'>('TODAS');
   
@@ -180,7 +192,46 @@ export const NutricionistaDashboard: React.FC<NutricionistaDashboardProps> = ({
 
   return (
     <div className="space-y-6">
-      
+
+      {/* Pestañas: Platos | Calculadora */}
+      <div className="flex flex-wrap gap-2 p-1.5 rounded-2xl bg-slate-950 border border-slate-800 w-fit">
+        <button
+          type="button"
+          onClick={() => setNutriTab('platos')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer transition-all ${
+            nutriTab === 'platos'
+              ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <Salad className="w-3.5 h-3.5" />
+          Platos
+        </button>
+        <button
+          type="button"
+          onClick={() => setNutriTab('calculadora')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer transition-all ${
+            nutriTab === 'calculadora'
+              ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <Calculator className="w-3.5 h-3.5" />
+          Calculadora
+        </button>
+      </div>
+
+      {nutriTab === 'calculadora' && onAddAlimento && onUpdateAlimento && onDeleteAlimento && (
+        <AlimentosCalculadoraManager
+          alimentos={alimentos}
+          onAdd={onAddAlimento}
+          onUpdate={onUpdateAlimento}
+          onDelete={onDeleteAlimento}
+        />
+      )}
+
+      {nutriTab === 'platos' && (
+      <>
       {/* Encabezado */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-slate-800 pb-5">
@@ -627,6 +678,9 @@ export const NutricionistaDashboard: React.FC<NutricionistaDashboardProps> = ({
 
           </div>
         </div>
+      )}
+
+      </>
       )}
 
     </div>

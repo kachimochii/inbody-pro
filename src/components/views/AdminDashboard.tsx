@@ -24,6 +24,7 @@ import {
   getRegionUnidad,
 } from '../../lib/unidadesCatalog';
 import { RosterQueryFilters } from '../../lib/firestoreService';
+import { FoodItem } from '../../data/foodDatabase';
 import { 
   Users, 
   AlertTriangle, 
@@ -97,6 +98,10 @@ interface AdminDashboardProps {
   onAddPlanNutricion: (plan: PlanNutricion) => void;
   onUpdatePlanNutricion: (plan: PlanNutricion) => void;
   onDeletePlanNutricion: (id: string) => void;
+  alimentosCalculadora: FoodItem[];
+  onAddAlimento: (item: FoodItem) => void;
+  onUpdateAlimento: (item: FoodItem) => void;
+  onDeleteAlimento: (id: string) => void;
   planesEntrenamiento: PlanEntrenamiento[];
   onAddPlanEntrenamiento: (plan: PlanEntrenamiento) => void;
   onUpdatePlanEntrenamiento: (plan: PlanEntrenamiento) => void;
@@ -132,6 +137,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onAddPlanNutricion,
   onUpdatePlanNutricion,
   onDeletePlanNutricion,
+  alimentosCalculadora,
+  onAddAlimento,
+  onUpdateAlimento,
+  onDeleteAlimento,
   planesEntrenamiento,
   onAddPlanEntrenamiento,
   onUpdatePlanEntrenamiento,
@@ -930,6 +939,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           onUpdatePlan={onUpdatePlanNutricion}
           onDeletePlan={onDeletePlanNutricion}
           isAdminMode={true}
+          alimentos={alimentosCalculadora}
+          onAddAlimento={onAddAlimento}
+          onUpdateAlimento={onUpdateAlimento}
+          onDeleteAlimento={onDeleteAlimento}
         />
       )}
 

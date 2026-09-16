@@ -6,6 +6,7 @@
 import React, { useEffect, useState } from 'react';
 import { UserAccount, UserRole, InBodyRecord, PlanNutricion, PlanEntrenamiento, FichaEdadCatalogo } from './types/inbody';
 import { MOCK_USUARIOS, MOCK_PLANES_NUTRICION, MOCK_PLANES_ENTRENAMIENTO } from './data/mockData';
+import { FOOD_DATABASE, FoodItem } from './data/foodDatabase';
 import { DEFAULT_FICHAS_EDAD } from './utils/localPersistence';
 import {
   fetchUserByCedula,
@@ -16,12 +17,15 @@ import {
   ROSTER_PAGE_SIZE,
   getEstadoInBodyLabel,
   seedPlanesIfEmpty,
+  seedAlimentosIfEmpty,
   upsertPlanEntrenamiento,
   deletePlanEntrenamiento,
   upsertPlanNutricion,
   deletePlanNutricion,
   upsertFichaEdad,
   deleteFichaEdad,
+  upsertAlimentoCalculadora,
+  deleteAlimentoCalculadora,
   saveUserRoleToFirestore,
   saveUserAccountToFirestore,
   appendMedicionToFirestore,
@@ -64,8 +68,9 @@ function MainAppContent() {
   const [planesNutricion, setPlanesNutricion] = useState<PlanNutricion[]>(MOCK_PLANES_NUTRICION);
   const [planesEntrenamiento, setPlanesEntrenamiento] = useState<PlanEntrenamiento[]>(MOCK_PLANES_ENTRENAMIENTO);
   const [fichasEdad, setFichasEdad] = useState<FichaEdadCatalogo[]>(DEFAULT_FICHAS_EDAD);
+  const [alimentosCalculadora, setAlimentosCalculadora] = useState<FoodItem[]>(FOOD_DATABASE);
 
-  // Solo planes/fichas — no descargar todos los usuarios
+  // Solo planes/fichas/alimentos — no descargar todos los usuarios
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -76,6 +81,7 @@ function MainAppContent() {
           DEFAULT_FICHAS_EDAD,
           MOCK_PLANES_NUTRICION
         );
+        const alimentos = await seedAlimentosIfEmpty(FOOD_DATABASE);
         if (cancelled) return;
         // Firebase gana: no pisar planes ya editados (imágenes/videos). Solo completar faltantes.
         const byId = new Map<string, PlanEntrenamiento>();
@@ -84,6 +90,7 @@ function MainAppContent() {
         setPlanesEntrenamiento(Array.from(byId.values()));
         setFichasEdad(seeded.fichas.length ? seeded.fichas : DEFAULT_FICHAS_EDAD);
         setPlanesNutricion(seeded.nutri.length ? seeded.nutri : MOCK_PLANES_NUTRICION);
+        setAlimentosCalculadora(alimentos.length ? alimentos : FOOD_DATABASE);
         setCloudReady(true);
         setCloudError(null);
       } catch (err) {
@@ -95,6 +102,7 @@ function MainAppContent() {
           );
           // Aun sin nube, muestra los planes originales locales
           setPlanesEntrenamiento(MOCK_PLANES_ENTRENAMIENTO);
+          setAlimentosCalculadora(FOOD_DATABASE);
         }
       } finally {
         if (!cancelled) setCloudLoading(false);
@@ -262,6 +270,21 @@ function MainAppContent() {
     deletePlanNutricion(id).catch(console.error);
   };
 
+  const handleAddAlimento = (item: FoodItem) => {
+    setAlimentosCalculadora((prev) => [item, ...prev.filter((a) => a.id !== item.id)]);
+    upsertAlimentoCalculadora(item).catch(console.error);
+  };
+
+  const handleUpdateAlimento = (item: FoodItem) => {
+    setAlimentosCalculadora((prev) => prev.map((a) => (a.id === item.id ? item : a)));
+    upsertAlimentoCalculadora(item).catch(console.error);
+  };
+
+  const handleDeleteAlimento = (id: string) => {
+    setAlimentosCalculadora((prev) => prev.filter((a) => a.id !== id));
+    deleteAlimentoCalculadora(id).catch(console.error);
+  };
+
   const handleAddPlanEntrenamiento = (newPlan: PlanEntrenamiento) => {
     setPlanesEntrenamiento(prev => [newPlan, ...prev]);
     upsertPlanEntrenamiento(newPlan).catch(console.error);
@@ -299,10 +322,24 @@ function MainAppContent() {
     deleteFichaEdad(id).catch(console.error);
   };
 
-  // Agregar nueva medición a un usuario (historial: más reciente primero)
+  // Agregar nueva medición a un usuario (historial: más reciente primero; NUNCA reemplaza tomas previas)
   const handleAddMeasurementToUser = (cedula: string, record: InBodyRecord) => {
-    const mergeMediciones = (prev: InBodyRecord[]) =>
-      [record, ...prev].sort((a, b) => b.fecha.localeCompare(a.fecha));
+    const mergeMediciones = (prev: InBodyRecord[]) => {
+      // Si llega el mismo id (reintento), actualiza esa toma; si no, concatena historial
+      const withoutSameId = prev.filter((m) => m.id !== record.id);
+      // Evita duplicar la misma toma del mismo día con mismos kg/score
+      const withoutExactDup = withoutSameId.filter(
+        (m) =>
+          !(
+            m.fecha === record.fecha &&
+            Math.abs(m.peso - record.peso) < 0.05 &&
+            m.inbodyScore === record.inbodyScore
+          )
+      );
+      return [record, ...withoutExactDup].sort((a, b) =>
+        String(b.fecha).localeCompare(String(a.fecha))
+      );
+    };
 
     setUsers(prevUsers => 
       prevUsers.map(u => {
@@ -316,7 +353,6 @@ function MainAppContent() {
       })
     );
 
-    // Si el usuario actual es el evaluado, actualizar su estado inmediatamente
     if (currentUser && currentUser.cedula === cedula) {
       setCurrentUser(prev => prev ? ({
         ...prev,
@@ -331,7 +367,6 @@ function MainAppContent() {
       }) : null);
     }
 
-    // Persistencia en Firebase para que estadísticas y login queden concatenados
     appendMedicionToFirestore(cedula, record).catch(console.error);
   };
 
@@ -495,6 +530,7 @@ function MainAppContent() {
                 onBack={() => setInspectingUser(null)}
                 planesNutricion={planesNutricion}
                 planesEntrenamiento={planesEntrenamiento}
+                alimentosCalculadora={alimentosCalculadora}
               />
             </div>
           ) : (
@@ -512,6 +548,10 @@ function MainAppContent() {
               onAddPlanNutricion={handleAddPlanNutricion}
               onUpdatePlanNutricion={handleUpdatePlanNutricion}
               onDeletePlanNutricion={handleDeletePlanNutricion}
+              alimentosCalculadora={alimentosCalculadora}
+              onAddAlimento={handleAddAlimento}
+              onUpdateAlimento={handleUpdateAlimento}
+              onDeleteAlimento={handleDeleteAlimento}
               planesEntrenamiento={planesEntrenamiento}
               onAddPlanEntrenamiento={handleAddPlanEntrenamiento}
               onUpdatePlanEntrenamiento={handleUpdatePlanEntrenamiento}
@@ -547,6 +587,7 @@ function MainAppContent() {
             user={currentUser}
             planesNutricion={planesNutricion}
             planesEntrenamiento={planesEntrenamiento}
+            alimentosCalculadora={alimentosCalculadora}
           />
         )}
 
@@ -569,6 +610,10 @@ function MainAppContent() {
             onAddPlan={handleAddPlanNutricion}
             onUpdatePlan={handleUpdatePlanNutricion}
             onDeletePlan={handleDeletePlanNutricion}
+            alimentos={alimentosCalculadora}
+            onAddAlimento={handleAddAlimento}
+            onUpdateAlimento={handleUpdateAlimento}
+            onDeleteAlimento={handleDeleteAlimento}
           />
         )}
 

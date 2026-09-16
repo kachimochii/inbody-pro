@@ -10,6 +10,13 @@ service cloud.firestore {
     match /fichasEdad/{id} {
       allow read, write: if true;
     }
+    match /alimentosCalculadora/{id} {
+      allow read, write: if true;
+    }
+    // Un doc por cédula; se sobrescribe cada día (sin historial).
+    match /diarioCalorico/{cedula} {
+      allow read, write: if true;
+    }
     // Login privilegiado + panel Admin → Seguridad
     match /credenciales/{cedula} {
       allow read, write: if true;

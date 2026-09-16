@@ -33,6 +33,7 @@ import {
 } from '../types/inbody';
 import { EVALUADOS_INBODY_REALES } from '../data/inbodyEvaluados';
 import { expandUnidadesPorJerarquia, hasInbodyData } from './unidadesCatalog';
+import type { FoodCategory, FoodItem, MealData } from '../data/foodDatabase';
 
 /** Campos oficiales de usuario en Firestore (escalafón limpio). */
 export const FIRESTORE_USER_FIELDS = [
@@ -57,6 +58,9 @@ const COL_USUARIOS = 'usuarios';
 const COL_PLANES_ENTRENO = 'planesEntrenamiento';
 const COL_PLANES_NUTRI = 'planesNutricion';
 const COL_FICHAS = 'fichasEdad';
+const COL_ALIMENTOS = 'alimentosCalculadora';
+/** Un doc por cédula: se sobrescribe cada día (no acumula historial). */
+const COL_DIARIO = 'diarioCalorico';
 
 export const ROSTER_PAGE_SIZE = 100;
 
@@ -427,14 +431,23 @@ export async function saveUserAccountToFirestore(user: UserAccount): Promise<voi
   );
 }
 
-/** Agrega una medición al historial del usuario en Firestore (merge). */
+/** Agrega una medición al historial (concatena; no borra tomas anteriores). */
 export async function appendMedicionToFirestore(cedula: string, record: InBodyRecord): Promise<void> {
   const id = normalizeCedula(cedula);
   const snap = await getDoc(doc(db, COL_USUARIOS, id));
   const existing = snap.exists()
     ? parseMedicionesRaw(snap.data() as Record<string, unknown>, id)
     : [];
-  const merged = [record, ...existing.filter((m) => m.id !== record.id)].sort((a, b) =>
+  const withoutSameId = existing.filter((m) => m.id !== record.id);
+  const withoutExactDup = withoutSameId.filter(
+    (m) =>
+      !(
+        m.fecha === record.fecha &&
+        Math.abs(m.peso - record.peso) < 0.05 &&
+        m.inbodyScore === record.inbodyScore
+      )
+  );
+  const merged = [record, ...withoutExactDup].sort((a, b) =>
     String(b.fecha).localeCompare(String(a.fecha))
   );
   await setDoc(doc(db, COL_USUARIOS, id), { mediciones: merged, updatedAt: new Date().toISOString() }, { merge: true });
@@ -785,4 +798,85 @@ export async function seedPlanesIfEmpty(
   }
 
   return { planes, fichas, nutri };
+}
+
+export type DiarioActivityMode = 'sin_deporte' | 'con_deporte';
+
+export async function fetchAlimentosCalculadora(): Promise<FoodItem[]> {
+  const snap = await getDocs(collection(db, COL_ALIMENTOS));
+  return snap.docs.map((d) => {
+    const data = d.data() as Omit<FoodItem, 'id'>;
+    return {
+      id: d.id,
+      name: data.name || d.id,
+      cal: Number(data.cal) || 0,
+      sub: data.sub || '1 porción',
+      category: (data.category as FoodCategory) || 'otro',
+    };
+  });
+}
+
+export async function upsertAlimentoCalculadora(item: FoodItem): Promise<void> {
+  const { id, ...rest } = item;
+  await setDoc(doc(db, COL_ALIMENTOS, id), rest, { merge: true });
+}
+
+export async function deleteAlimentoCalculadora(id: string): Promise<void> {
+  await deleteDoc(doc(db, COL_ALIMENTOS, id));
+}
+
+/** Si la colección está vacía, siembra el catálogo base. */
+export async function seedAlimentosIfEmpty(seed: FoodItem[]): Promise<FoodItem[]> {
+  const existing = await fetchAlimentosCalculadora();
+  if (existing.length > 0) return existing;
+  if (seed.length === 0) return [];
+
+  const chunk = 400;
+  for (let i = 0; i < seed.length; i += chunk) {
+    const batch = writeBatch(db);
+    seed.slice(i, i + chunk).forEach((item) => {
+      const { id, ...rest } = item;
+      batch.set(doc(db, COL_ALIMENTOS, id), rest);
+    });
+    await batch.commit();
+  }
+  return seed;
+}
+
+export interface DiarioCaloricoCloud {
+  date: string;
+  mode: DiarioActivityMode | null;
+  meals: MealData;
+  updatedAt?: string;
+}
+
+export async function fetchDiarioCalorico(cedula: string): Promise<DiarioCaloricoCloud | null> {
+  const id = normalizeCedula(cedula);
+  const snap = await getDoc(doc(db, COL_DIARIO, id));
+  if (!snap.exists()) return null;
+  const data = snap.data() as DiarioCaloricoCloud;
+  return {
+    date: data.date || '',
+    mode: data.mode ?? null,
+    meals: data.meals || ({} as MealData),
+    updatedAt: data.updatedAt,
+  };
+}
+
+/** Sobrescribe el mismo documento del usuario (sin historial por día). */
+export async function saveDiarioCalorico(
+  cedula: string,
+  record: { date: string; mode: DiarioActivityMode | null; meals: MealData }
+): Promise<void> {
+  const id = normalizeCedula(cedula);
+  await setDoc(
+    doc(db, COL_DIARIO, id),
+    {
+      date: record.date,
+      mode: record.mode,
+      meals: record.meals,
+      updatedAt: new Date().toISOString(),
+    },
+    { merge: false }
+  );
 }
