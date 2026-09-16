@@ -3,6 +3,10 @@ import { SomatotipoTipo, PlanEntrenamiento, FichaEdadCatalogo } from '../../type
 import { DEFINICIONES_SOMATOTIPOS, GALERIA_ENTRENAMIENTO } from '../../data/mockData';
 import { readImageAsDataUrl } from '../../utils/localPersistence';
 import { uploadImageToStorage } from '../../lib/firestoreService';
+import { extractYoutubeVideoId } from '../../utils/inbodyCalculations';
+import { ZoomablePlanImage, ImageZoomLightbox } from '../ImageZoomLightbox';
+import { YoutubeBackgroundAudio } from '../YoutubeBackgroundAudio';
+import { PlanVideoEmbed } from '../PlanVideoEmbed';
 import { 
   Dumbbell, 
   Plus, 
@@ -22,6 +26,11 @@ import {
   Mars,
   Copy,
   Music,
+  Eye,
+  Play,
+  Pause,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 
 type SexoDestino = 'M' | 'F' | 'TODOS';
@@ -55,6 +64,11 @@ export const EntrenadorDashboard: React.FC<EntrenadorDashboardProps> = ({
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
+  const [previewPlan, setPreviewPlan] = useState<PlanEntrenamiento | null>(null);
+  const [formPreviewSrc, setFormPreviewSrc] = useState<{ src: string; alt: string } | null>(null);
+  const [previewAudioPlaying, setPreviewAudioPlaying] = useState(false);
+  const [previewAudioMuted, setPreviewAudioMuted] = useState(false);
+  const [previewSesionIniciada, setPreviewSesionIniciada] = useState(false);
 
   const [formNombre, setFormNombre] = useState('');
   const [formSomatotipo, setFormSomatotipo] = useState<SomatotipoTipo>('Tipo estándar');
@@ -229,6 +243,19 @@ export const EntrenadorDashboard: React.FC<EntrenadorDashboardProps> = ({
     };
     onAddPlan(copia);
     showNotify(`Plan duplicado: "${copia.nombre}".`);
+  };
+
+  const openPreview = (plan: PlanEntrenamiento) => {
+    setPreviewAudioPlaying(false);
+    setPreviewAudioMuted(false);
+    setPreviewSesionIniciada(false);
+    setPreviewPlan(plan);
+  };
+
+  const closePreview = () => {
+    setPreviewAudioPlaying(false);
+    setPreviewSesionIniciada(false);
+    setPreviewPlan(null);
   };
 
   const handleSaveFichaCard = () => {
@@ -542,7 +569,15 @@ export const EntrenadorDashboard: React.FC<EntrenadorDashboardProps> = ({
 
               <div className="p-4 bg-slate-950/60 border-t border-slate-800 flex items-center justify-between gap-2">
                 <span className="text-[10px] text-slate-500">{plan.autor || 'Entrenador'}</span>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                  <button
+                    onClick={() => openPreview(plan)}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 text-xs font-bold transition-colors cursor-pointer border border-emerald-500/40"
+                    title="Ver como lo ve el usuario"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    Ver
+                  </button>
                   <button
                     onClick={() => handleDuplicate(plan)}
                     className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-colors cursor-pointer border border-slate-700"
@@ -675,9 +710,14 @@ export const EntrenadorDashboard: React.FC<EntrenadorDashboardProps> = ({
                   className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white outline-none focus:border-blue-500"
                 />
                 {formPortadaUrl && (
-                  <div className="mt-2 rounded-xl overflow-hidden border border-slate-800 bg-black h-20">
+                  <button
+                    type="button"
+                    onClick={() => setFormPreviewSrc({ src: formPortadaUrl, alt: 'Portada del plan' })}
+                    className="mt-2 rounded-xl overflow-hidden border border-slate-800 bg-black h-20 w-full cursor-zoom-in text-left"
+                    title="Ver portada a tamaño completo"
+                  >
                     <img src={formPortadaUrl} alt="Portada" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                  </div>
+                  </button>
                 )}
                 <div className="flex gap-1 overflow-x-auto pt-1">
                   {GALERIA_ENTRENAMIENTO.map((im, idx) => (
@@ -730,9 +770,14 @@ export const EntrenadorDashboard: React.FC<EntrenadorDashboardProps> = ({
                 />
                 {uploadError && <p className="text-[11px] text-rose-400">{uploadError}</p>}
                 {formImagenUrl && (
-                  <div className="mt-2 rounded-xl overflow-hidden border border-slate-800 bg-black max-h-28">
+                  <button
+                    type="button"
+                    onClick={() => setFormPreviewSrc({ src: formImagenUrl, alt: 'Imagen guía del plan' })}
+                    className="mt-2 rounded-xl overflow-hidden border border-slate-800 bg-black max-h-28 w-full cursor-zoom-in text-left"
+                    title="Ver imagen guía a tamaño completo"
+                  >
                     <img src={formImagenUrl} alt="Vista previa guía" className="w-full max-h-28 object-contain" referrerPolicy="no-referrer" />
-                  </div>
+                  </button>
                 )}
                 <div className="flex gap-1 overflow-x-auto pt-1">
                   {GALERIA_ENTRENAMIENTO.map((im, idx) => (
@@ -828,6 +873,177 @@ export const EntrenadorDashboard: React.FC<EntrenadorDashboardProps> = ({
             </form>
           </div>
         </div>
+      )}
+
+      {/* Vista previa: cómo lo ve el evaluado (con música real) */}
+      {previewPlan && (() => {
+        const musicaVideoId = extractYoutubeVideoId(previewPlan.musicaFondoUrl || '');
+        return (
+          <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-start justify-center p-3 sm:p-4 overflow-y-auto">
+            {musicaVideoId && (
+              <YoutubeBackgroundAudio
+                videoId={musicaVideoId}
+                playing={previewAudioPlaying}
+                muted={previewAudioMuted}
+              />
+            )}
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-4xl w-full shadow-2xl my-4 sm:my-6 overflow-hidden max-h-[min(94vh,960px)] flex flex-col">
+              <div className="flex items-center justify-between gap-3 p-4 sm:p-5 border-b border-slate-800 bg-slate-950/95 shrink-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden border border-slate-700 shrink-0 bg-slate-800">
+                    <img
+                      src={previewPlan.portadaUrl || previewPlan.imagenUrl}
+                      alt=""
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400">
+                      Vista del usuario · Previsualización
+                    </span>
+                    <h3 className="text-base sm:text-lg font-black text-white truncate">
+                      {previewPlan.nombre}
+                    </h3>
+                    <p className="text-[11px] text-slate-400 truncate">
+                      {previewPlan.somatotipo} · {previewPlan.fichaEdad} · {sexoLabel(previewPlan.sexoDestino || 'TODOS')}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={closePreview}
+                  className="flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] sm:text-xs font-bold uppercase tracking-wider cursor-pointer border border-slate-700 shrink-0"
+                >
+                  <X className="w-4 h-4 text-emerald-400" />
+                  Cerrar
+                </button>
+              </div>
+
+              <div className="p-4 sm:p-6 space-y-5 overflow-y-auto flex-1 min-h-0">
+                <div className="space-y-5 rounded-3xl border border-slate-800 bg-slate-950 p-4 sm:p-6">
+                  <div>
+                    <span className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">
+                      {previewPlan.enfoque || 'Entrenamiento'} · {previewPlan.fichaEdad}
+                    </span>
+                    <h4 className="text-xl font-black text-white mt-1">{previewPlan.nombre}</h4>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+                      Descripción e instrucciones
+                    </span>
+                    <p className="text-sm text-slate-300 leading-relaxed">{previewPlan.descripcion}</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Imagen guía del plan
+                    </span>
+                    <ZoomablePlanImage
+                      src={previewPlan.imagenUrl}
+                      alt={previewPlan.nombre}
+                      overlay={
+                        musicaVideoId ? (
+                          <div className="absolute top-3 right-3 flex items-center gap-1.5 z-10">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPreviewSesionIniciada(true);
+                                setPreviewAudioPlaying((prev) => !prev);
+                              }}
+                              className="w-9 h-9 rounded-full bg-slate-950/80 border border-white/20 text-white flex items-center justify-center hover:bg-blue-600 transition-colors cursor-pointer backdrop-blur-md shadow-lg"
+                              title={previewAudioPlaying ? 'Pausar música' : 'Reproducir música'}
+                            >
+                              {previewAudioPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setPreviewAudioMuted((prev) => !prev)}
+                              className="w-9 h-9 rounded-full bg-slate-950/80 border border-white/20 text-white flex items-center justify-center hover:bg-slate-700 transition-colors cursor-pointer backdrop-blur-md shadow-lg"
+                              title={previewAudioMuted ? 'Activar sonido' : 'Silenciar'}
+                            >
+                              {previewAudioMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                            </button>
+                          </div>
+                        ) : null
+                      }
+                    />
+                  </div>
+
+                  {musicaVideoId ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPreviewSesionIniciada(true);
+                        setPreviewAudioPlaying(true);
+                      }}
+                      className={`w-full py-3.5 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer transition-all ${
+                        previewSesionIniciada && previewAudioPlaying
+                          ? 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-lg shadow-cyan-600/30'
+                          : 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/30'
+                      }`}
+                    >
+                      {previewSesionIniciada && previewAudioPlaying ? (
+                        <>
+                          <Music className="w-4 h-4" />
+                          Entrenamiento en curso · escuchando audio
+                        </>
+                      ) : (
+                        <>
+                          <Play className="w-4 h-4" />
+                          Iniciar entrenamiento (probar música)
+                        </>
+                      )}
+                    </button>
+                  ) : (
+                    <div className="space-y-2">
+                      <button
+                        type="button"
+                        onClick={() => setPreviewSesionIniciada(true)}
+                        className="w-full py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-blue-600/30"
+                      >
+                        <Play className="w-4 h-4" />
+                        Iniciar entrenamiento
+                      </button>
+                      <p className="text-[10px] text-amber-400/90 text-center">
+                        Este plan no tiene música de fondo cargada. Agrega una URL de YouTube en Editar para probarla aquí.
+                      </p>
+                    </div>
+                  )}
+
+                  {previewPlan.videoUrl && (
+                    <PlanVideoEmbed videoUrl={previewPlan.videoUrl} title={previewPlan.nombre} />
+                  )}
+
+                  {previewPlan.ejerciciosClave && previewPlan.ejerciciosClave.length > 0 && (
+                    <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 space-y-2">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                        Protocolos (opcional)
+                      </span>
+                      <ul className="space-y-1.5 text-xs text-slate-300">
+                        {previewPlan.ejerciciosClave.map((ej, idx) => (
+                          <li key={idx} className="flex items-start gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5 shrink-0" />
+                            <span>{ej}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {formPreviewSrc && (
+        <ImageZoomLightbox
+          src={formPreviewSrc.src}
+          alt={formPreviewSrc.alt}
+          onClose={() => setFormPreviewSrc(null)}
+        />
       )}
     </div>
   );

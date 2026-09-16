@@ -1,45 +1,131 @@
 import { InBodyRecord, SegmentalValues, Sexo, SomatotipoTipo } from '../types/inbody';
+import {
+  calcularAnalisisCorporal,
+  getNivelSalud,
+  pctMusculoPiernasFromSegmental,
+  pctSmmFromKg,
+} from './composicionCorporal';
 
 export const TICKS = {
   peso: [21, 43, 64, 85, 93, 100, 107, 115, 136, 157, 179],
   musculo: [83, 85, 88, 90, 95, 100, 105, 110, 113, 115, 117],
-  grasa: [42, 50, 58, 67, 83, 100, 117, 133, 142, 150, 158]
+  grasa: [42, 50, 58, 67, 83, 100, 117, 133, 142, 150, 158],
 };
 
 export const TICKS_OBESIDAD = {
   imc: [12, 14, 16, 18, 20, 21, 23, 25, 31, 37, 43],
   pctGrasa: [6, 7, 8, 10, 12, 15, 17, 20, 33, 47, 61],
-  adiposidad: [82, 85, 87, 90, 95, 100, 105, 110, 112, 115, 117]
+  adiposidad: [82, 85, 87, 90, 95, 100, 105, 110, 112, 115, 117],
 };
 
+/**
+ * @deprecated Preferir resolveTipoCuerpo / calcularAnalisisCorporal.
+ * Firma antigua por IMC — aproxima SMM para no romper callers.
+ */
 export function determineSomatotipo(imc: number, pctGrasa: number, sexo: Sexo): SomatotipoTipo {
-  const pbfBajo = sexo === 'F' ? 18.0 : 10.0;
-  const pbfAlto = sexo === 'F' ? 28.0 : 20.0;
-
-  if (imc < 18.5) {
-    if (pctGrasa < pbfBajo) return "Tipo delgado";
-    if (pctGrasa <= pbfAlto) return "Tipo musculoso magro";
-    return "Falta de tipo de ejercicio";
-  } else if (imc <= 24.9) {
-    if (pctGrasa < pbfBajo) return "Tipo musculoso desarrollado";
-    if (pctGrasa <= pbfAlto) return "Tipo estándar";
-    return "Tipo de sobrepeso muscular";
-  } else {
-    if (pctGrasa < pbfBajo) return "Tipo muscular estándar";
-    if (pctGrasa <= pbfAlto) return "Tipo muscular con sobrepeso";
-    return "Tipo obeso edematoso";
-  }
+  const pctSMMApprox = sexo === 'F' ? 34 : 42;
+  return calcularAnalisisCorporal({
+    edad: 30,
+    sexo,
+    pctGrasa,
+    pctSMM: pctSMMApprox,
+    grasaVisceral: pctGrasa > 28 ? 12 : 6,
+    puntajeSalud: imc > 25 ? 65 : 78,
+  }).tipoCuerpo;
 }
 
-export function calculateBiologicalAge(edadCronologica: number, score: number): number {
-  if (score < 80) {
-    const penalizacion = Math.round((80 - score) * 0.3);
-    return edadCronologica + Math.min(penalizacion, 15);
-  } else if (score > 80) {
-    const premio = Math.round((score - 80) * 0.25);
-    return Math.max(18, edadCronologica - Math.min(premio, 7));
-  }
-  return edadCronologica;
+export function getNivelFromScore(score: number): 1 | 2 | 3 {
+  return getNivelSalud(score);
+}
+
+export interface BiologicalAgeParams {
+  edadCronologica: number;
+  score: number;
+  pctGrasa?: number;
+  grasaVisceral?: number;
+  tipoCuerpo?: string;
+  sexo?: Sexo;
+  adiposidad?: number;
+  pctSMM?: number;
+  pctMusculoPiernas?: number;
+  musculoKg?: number;
+  pesoKg?: number;
+}
+
+/** Edad corporal automática (nunca toma valor del equipo/CSV). */
+export function calculateBiologicalAge(params: BiologicalAgeParams): number;
+export function calculateBiologicalAge(edadCronologica: number, score: number): number;
+export function calculateBiologicalAge(
+  edadOrParams: number | BiologicalAgeParams,
+  scoreMaybe?: number
+): number {
+  const p: BiologicalAgeParams =
+    typeof edadOrParams === 'number'
+      ? { edadCronologica: edadOrParams, score: scoreMaybe ?? 70 }
+      : edadOrParams;
+
+  const sexo: Sexo = p.sexo === 'F' ? 'F' : 'M';
+  const pctSMM =
+    p.pctSMM ??
+    (p.musculoKg != null && p.pesoKg != null
+      ? pctSmmFromKg(p.musculoKg, p.pesoKg)
+      : sexo === 'F'
+        ? 34
+        : 42);
+
+  return calcularAnalisisCorporal({
+    edad: p.edadCronologica,
+    sexo,
+    pctGrasa: p.pctGrasa ?? (sexo === 'F' ? 25 : 18),
+    pctSMM,
+    grasaVisceral: p.grasaVisceral ?? 5,
+    pctMusculoPiernas: p.pctMusculoPiernas,
+    puntajeSalud: p.score,
+  }).edadCorporal;
+}
+
+/** Siempre recalcula (ignora edadCorporal guardada del equipo). */
+export function resolveEdadCorporal(
+  medicion: Pick<
+    InBodyRecord,
+    'inbodyScore' | 'pctGrasa' | 'grasaVisceral' | 'musculoKg' | 'peso' | 'segmental'
+  >,
+  edadCronologica: number,
+  sexo: Sexo = 'M',
+  _preferStoredIfSensible = false
+): number {
+  return calcularAnalisisCorporal({
+    edad: edadCronologica,
+    sexo,
+    pctGrasa: medicion.pctGrasa,
+    pctSMM: pctSmmFromKg(medicion.musculoKg, medicion.peso),
+    grasaVisceral: medicion.grasaVisceral,
+    pctMusculoPiernas: pctMusculoPiernasFromSegmental(
+      medicion.segmental?.musculoPDPct,
+      medicion.segmental?.musculoPIPct
+    ),
+    puntajeSalud: medicion.inbodyScore,
+  }).edadCorporal;
+}
+
+/** Somatotipo automático (ignora InBody Type del CSV). */
+export function resolveTipoCuerpo(
+  medicion: Pick<InBodyRecord, 'pctGrasa' | 'grasaVisceral' | 'musculoKg' | 'peso' | 'inbodyScore' | 'segmental'>,
+  edadCronologica: number,
+  sexo: Sexo = 'M'
+): SomatotipoTipo {
+  return calcularAnalisisCorporal({
+    edad: edadCronologica,
+    sexo,
+    pctGrasa: medicion.pctGrasa,
+    pctSMM: pctSmmFromKg(medicion.musculoKg, medicion.peso),
+    grasaVisceral: medicion.grasaVisceral,
+    pctMusculoPiernas: pctMusculoPiernasFromSegmental(
+      medicion.segmental?.musculoPDPct,
+      medicion.segmental?.musculoPIPct
+    ),
+    puntajeSalud: medicion.inbodyScore,
+  }).tipoCuerpo;
 }
 
 export function calculateTickPosition(
@@ -72,8 +158,15 @@ function getPositionInTicks(val: number, ticks: number[]): number {
 
 export function calculateAge(fechaNacimiento: string): number {
   if (!fechaNacimiento) return 30;
+  // Soporta YYYY-MM-DD y DD/MM/YYYY
+  let nac: Date;
+  const dmy = String(fechaNacimiento).trim().match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (dmy) {
+    nac = new Date(Number(dmy[3]), Number(dmy[2]) - 1, Number(dmy[1]));
+  } else {
+    nac = new Date(fechaNacimiento);
+  }
   const hoy = new Date();
-  const nac = new Date(fechaNacimiento);
   let edad = hoy.getFullYear() - nac.getFullYear();
   const m = hoy.getMonth() - nac.getMonth();
   if (m < 0 || (m === 0 && hoy.getDate() < nac.getDate())) {
@@ -83,10 +176,16 @@ export function calculateAge(fechaNacimiento: string): number {
 }
 
 export function calculateTimeInService(fechaIngreso: string): string {
-  if (!fechaIngreso) return "Sin datos";
+  if (!fechaIngreso) return 'Sin datos';
   const hoy = new Date();
-  const ing = new Date(fechaIngreso);
-  if (isNaN(ing.getTime())) return "Sin datos";
+  let ing: Date;
+  const dmy = String(fechaIngreso).trim().match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (dmy) {
+    ing = new Date(Number(dmy[3]), Number(dmy[2]) - 1, Number(dmy[1]));
+  } else {
+    ing = new Date(fechaIngreso);
+  }
+  if (isNaN(ing.getTime())) return 'Sin datos';
 
   let anios = hoy.getFullYear() - ing.getFullYear();
   let meses = hoy.getMonth() - ing.getMonth();
@@ -129,9 +228,11 @@ export function generateIframeUrl(url: string): string {
   if (!url) return '';
   if (url.includes('youtube.com') || url.includes('youtu.be')) {
     const videoId = extractYoutubeVideoId(url);
-    if (videoId) return `https://www.youtube.com/embed/${videoId}?rel=0`;
+    if (videoId) {
+      // controls=1: play/pausa + barra de progreso nativos de YouTube
+      return `https://www.youtube.com/embed/${videoId}?rel=0&controls=1&modestbranding=1&playsinline=1&fs=1`;
+    }
   }
-  // TikTok: intenta embed; si el navegador bloquea, el UI ofrece abrir enlace
   if (url.includes('tiktok.com')) {
     const match = url.match(/video\/(\d+)/);
     if (match?.[1]) return `https://www.tiktok.com/embed/v2/${match[1]}`;
@@ -157,6 +258,7 @@ export function createRecordFromRaw(
     grasaVisceral?: number;
     inbodyScore?: number;
     sexo?: Sexo;
+    edadCronologica?: number;
   }
 ): InBodyRecord {
   const altura = raw.alturaCm || 170;
@@ -171,16 +273,12 @@ export function createRecordFromRaw(
   const mineralesKg = raw.mineralesKg || parseFloat((peso * 0.05).toFixed(1));
   const ffmKg = parseFloat((aguaKg + proteinaKg + mineralesKg).toFixed(1));
   const sexo = raw.sexo || 'M';
-  const score = raw.inbodyScore || Math.min(99, Math.max(50, Math.round(80 + (musculoKg - 32) * 1.5 - (pctGrasa - 18) * 1.2)));
+  const score =
+    raw.inbodyScore ||
+    Math.min(99, Math.max(50, Math.round(80 + (musculoKg - 32) * 1.5 - (pctGrasa - 18) * 1.2)));
   const tmb = Math.round(370 + 21.6 * ffmKg);
   const grasaVisceral = raw.grasaVisceral || Math.round(pctGrasa / 3);
-  const tipoCuerpo = determineSomatotipo(imc, pctGrasa, sexo);
-
-  const pesoIdeal = parseFloat((alturaM * alturaM * 22).toFixed(1));
-  const controlPeso = parseFloat((pesoIdeal - peso).toFixed(1));
-  const grasaIdeal = parseFloat((pesoIdeal * (sexo === 'M' ? 0.15 : 0.23)).toFixed(1));
-  const controlGrasa = parseFloat((grasaIdeal - grasaKg).toFixed(1));
-  const controlMuscular = parseFloat((Math.max(0, 32 - musculoKg)).toFixed(1));
+  const edadCron = raw.edadCronologica ?? 30;
 
   const segmental: SegmentalValues = {
     musculoBD: parseFloat((musculoKg * 0.105).toFixed(2)),
@@ -193,7 +291,6 @@ export function createRecordFromRaw(
     musculoPDPct: 104,
     musculoPI: parseFloat((musculoKg * 0.170).toFixed(2)),
     musculoPIPct: 103,
-
     grasaBD: parseFloat((grasaKg * 0.08).toFixed(2)),
     grasaBDPct: 110,
     grasaBI: parseFloat((grasaKg * 0.08).toFixed(2)),
@@ -203,34 +300,50 @@ export function createRecordFromRaw(
     grasaPD: parseFloat((grasaKg * 0.16).toFixed(2)),
     grasaPDPct: 112,
     grasaPI: parseFloat((grasaKg * 0.16).toFixed(2)),
-    grasaPIPct: 110
+    grasaPIPct: 110,
   };
 
+  const analisis = calcularAnalisisCorporal({
+    edad: edadCron,
+    sexo,
+    pctGrasa,
+    pctSMM: pctSmmFromKg(musculoKg, peso),
+    grasaVisceral,
+    pctMusculoPiernas: pctMusculoPiernasFromSegmental(segmental.musculoPDPct, segmental.musculoPIPct),
+    puntajeSalud: score,
+  });
+
+  const pesoIdeal = parseFloat((alturaM * alturaM * 22).toFixed(1));
+  const controlPeso = parseFloat((pesoIdeal - peso).toFixed(1));
+  const grasaIdeal = parseFloat((pesoIdeal * (sexo === 'M' ? 0.15 : 0.23)).toFixed(1));
+  const controlGrasa = parseFloat((grasaIdeal - grasaKg).toFixed(1));
+  const controlMuscular = parseFloat((Math.max(0, 32 - musculoKg)).toFixed(1));
+
   return {
-    id: `med-${Date.now()}`,
+    id: `med-${cedula || 'x'}-${Date.now()}`,
     fecha: new Date().toISOString().split('T')[0],
     alturaCm: altura,
-    peso: peso,
-    aguaKg: aguaKg,
-    proteinaKg: proteinaKg,
-    mineralesKg: mineralesKg,
-    grasaKg: grasaKg,
-    ffmKg: ffmKg,
-    musculoKg: musculoKg,
-    imc: imc,
-    pctGrasa: pctGrasa,
+    peso,
+    aguaKg,
+    proteinaKg,
+    mineralesKg,
+    grasaKg,
+    ffmKg,
+    musculoKg,
+    imc,
+    pctGrasa,
     inbodyScore: score,
-    tmb: tmb,
-    grasaVisceral: grasaVisceral,
+    tmb,
+    grasaVisceral,
     grasaSubcutaneaKg: parseFloat((grasaKg * 0.88).toFixed(1)),
     adiposidad: Math.round((grasaKg / (pesoIdeal * 0.15)) * 100),
     caloriasRecomendadas: Math.round(tmb * 1.35),
-    tipoCuerpo: tipoCuerpo,
-    edadCorporal: calculateBiologicalAge(30, score),
-    pesoIdeal: pesoIdeal,
-    controlPeso: controlPeso,
-    controlGrasa: controlGrasa,
-    controlMuscular: controlMuscular,
+    tipoCuerpo: analisis.tipoCuerpo,
+    edadCorporal: analisis.edadCorporal,
+    pesoIdeal,
+    controlPeso,
+    controlGrasa,
+    controlMuscular,
     rangoPesoMin: parseFloat((pesoIdeal * 0.85).toFixed(1)),
     rangoPesoMax: parseFloat((pesoIdeal * 1.15).toFixed(1)),
     rangoSmmMin: parseFloat((musculoKg * 0.88).toFixed(1)),
@@ -241,6 +354,6 @@ export function createRecordFromRaw(
     rangoImcMax: 25.0,
     rangoPbfMin: sexo === 'M' ? 10.0 : 18.0,
     rangoPbfMax: sexo === 'M' ? 20.0 : 28.0,
-    segmental: segmental
+    segmental,
   };
 }
