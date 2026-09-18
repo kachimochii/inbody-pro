@@ -4,7 +4,7 @@ import {
   CreditosConfig,
   DEFAULT_CREDITOS,
   getCreditosConfig,
-  saveCreditosConfig,
+  saveCreditosEquipo,
 } from '../lib/institucionalConfig';
 import { Award, Pencil, Plus, Save, Trash2 } from 'lucide-react';
 
@@ -64,7 +64,7 @@ export const CreditosInstitucionales: React.FC<CreditosInstitucionalesProps> = (
     setMsg('');
     setErr('');
     try {
-      await saveCreditosConfig(cfg);
+      await saveCreditosEquipo(cfg.equipo);
       setMsg('Créditos guardados. Ya se reflejan para el administrador.');
       setTimeout(() => setMsg(''), 3500);
     } catch {

@@ -87,6 +87,37 @@ export async function saveCreditosConfig(cfg: CreditosConfig): Promise<void> {
   );
 }
 
+/** Solo equipo (no pisa impacto/frases del panel Apariencia). */
+export async function saveCreditosEquipo(equipo: CreditoPersona[]): Promise<void> {
+  await setDoc(
+    doc(db, 'config', 'creditos'),
+    { equipo, updatedAt: new Date().toISOString() },
+    { merge: true }
+  );
+}
+
+/** Solo impacto + frases (no pisa el equipo del editor de créditos). */
+export async function saveCreditosImpacto(
+  cfg: Pick<
+    CreditosConfig,
+    'impactoValor' | 'impactoTexto' | 'frase1' | 'frase1Color' | 'frase2' | 'frase2Color'
+  >
+): Promise<void> {
+  await setDoc(
+    doc(db, 'config', 'creditos'),
+    {
+      impactoValor: cfg.impactoValor,
+      impactoTexto: cfg.impactoTexto,
+      frase1: cfg.frase1,
+      frase1Color: cfg.frase1Color,
+      frase2: cfg.frase2,
+      frase2Color: cfg.frase2Color,
+      updatedAt: new Date().toISOString(),
+    },
+    { merge: true }
+  );
+}
+
 export async function getAparienciaConfig(): Promise<AparienciaConfig> {
   const snap = await getDoc(doc(db, 'config', 'apariencia'));
   if (!snap.exists()) return { ...DEFAULT_APARIENCIA };

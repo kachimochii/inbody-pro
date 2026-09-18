@@ -35,8 +35,11 @@ service cloud.firestore {
     }
 
     match /config/{doc} {
-      allow read: if signedIn();
-      allow write: if isAdmin();
+      // Apariencia/créditos públicos (login); el resto requiere sesión.
+      allow read: if signedIn() || doc == 'apariencia' || doc == 'creditos';
+      // Admin: toda config. Nutricionista: solo baremos de edad corporal.
+      allow write: if isAdmin()
+        || (isNutricionista() && doc == 'baremosEdadCorporal');
     }
 
     match /planesEntrenamiento/{id} {

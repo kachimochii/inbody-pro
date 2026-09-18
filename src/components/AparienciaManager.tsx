@@ -7,7 +7,7 @@ import {
   getAparienciaConfig,
   getCreditosConfig,
   saveAparienciaConfig,
-  saveCreditosConfig,
+  saveCreditosImpacto,
   uploadFondoInstitucional,
 } from '../lib/institucionalConfig';
 import { Image as ImageIcon, Monitor, Save, Smartphone, Trash2, Upload } from 'lucide-react';
@@ -29,6 +29,7 @@ export const AparienciaManager: React.FC<AparienciaManagerProps> = ({ onAparienc
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [previewBroken, setPreviewBroken] = useState(false);
+  const [creditosReady, setCreditosReady] = useState(false);
 
   useEffect(() => {
     Promise.all([getAparienciaConfig(), getCreditosConfig()])
@@ -36,6 +37,7 @@ export const AparienciaManager: React.FC<AparienciaManagerProps> = ({ onAparienc
         setApariencia(a);
         setUrlDraft(a.fondoUrl);
         setCreditos(c);
+        setCreditosReady(true);
       })
       .catch(console.error);
   }, []);
@@ -46,6 +48,7 @@ export const AparienciaManager: React.FC<AparienciaManagerProps> = ({ onAparienc
     setPreviewBroken(false);
   }, [previewUrl]);
 
+  /** Solo fondo/opacidad — no toca créditos (evita pisar equipo/impacto). */
   const persistApariencia = async (fondoUrl: string, opacidad: number) => {
     const next: AparienciaConfig = {
       fondoUrl,
@@ -53,7 +56,6 @@ export const AparienciaManager: React.FC<AparienciaManagerProps> = ({ onAparienc
       updatedAt: new Date().toISOString(),
     };
     await saveAparienciaConfig(next);
-    await saveCreditosConfig(creditos);
     setApariencia(next);
     setUrlDraft(fondoUrl);
     onAparienciaSaved?.(next);
@@ -86,6 +88,16 @@ export const AparienciaManager: React.FC<AparienciaManagerProps> = ({ onAparienc
     setMsg('');
     try {
       await persistApariencia(urlDraft.trim(), apariencia.opacidad);
+      if (creditosReady) {
+        await saveCreditosImpacto({
+          impactoValor: creditos.impactoValor,
+          impactoTexto: creditos.impactoTexto,
+          frase1: creditos.frase1,
+          frase1Color: creditos.frase1Color,
+          frase2: creditos.frase2,
+          frase2Color: creditos.frase2Color,
+        });
+      }
       setMsg('Apariencia e impacto guardados en Firebase para todos los usuarios.');
     } catch {
       setErr('No se pudo guardar. Revise reglas de config y Storage.');
