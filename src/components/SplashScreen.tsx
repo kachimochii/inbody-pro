@@ -10,6 +10,7 @@ const FADE_MS = 500;
 
 export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
   const [fading, setFading] = useState(false);
+  const [ready, setReady] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const onFinishRef = useRef(onFinish);
   const mountedRef = useRef(true);
@@ -52,9 +53,13 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
     };
 
     const handleEnded = () => beginExit();
-    const handlePlaying = () => startPlaybackTimer();
+    const handlePlaying = () => {
+      setReady(true);
+      startPlaybackTimer();
+    };
     const handleError = () => {
       if (!mountedRef.current) return;
+      setReady(true);
       startPlaybackTimer();
     };
 
@@ -67,6 +72,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
       playPromise.catch((err: unknown) => {
         const name = err && typeof err === 'object' && 'name' in err ? String(err.name) : '';
         if (name === 'AbortError' || !mountedRef.current) return;
+        setReady(true);
         startPlaybackTimer();
       });
     }
@@ -101,7 +107,9 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
     >
       <video
         ref={videoRef}
-        className="w-full h-full object-contain"
+        className={`w-full h-full object-contain transition-opacity duration-200 ${
+          ready ? 'opacity-100' : 'opacity-0'
+        }`}
         autoPlay
         muted
         playsInline

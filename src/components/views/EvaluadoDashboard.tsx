@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { UserAccount, SomatotipoDefinicion, SomatotipoTipo, PlanNutricion, PlanEntrenamiento, RegionEcuador } from '../../types/inbody';
 import { 
   DEFINICIONES_SOMATOTIPOS, 
@@ -23,6 +23,17 @@ import {
 import { SomatotipoModal } from '../SomatotipoModal';
 import { GuiaInbodyModal } from '../GuiaInbodyModal';
 import { EdadCorporalCard } from '../EdadCorporalCard';
+import { CambiarPinModal } from '../CambiarPinModal';
+import {
+  buildDeltasHistorial,
+  buildFrasesMotivacion,
+  SEMAFORO_UI,
+  formatDelta,
+} from '../../utils/motivacionInbody';
+import { PillarPills } from '../PillarPills';
+import { ImpactCounter } from '../ImpactCounter';
+import { LevelUpConfetti } from '../LevelUpConfetti';
+import { DEFAULT_CREDITOS, getCreditosConfig } from '../../lib/institucionalConfig';
 import { YoutubeBackgroundAudio } from '../YoutubeBackgroundAudio';
 import { CalculadoraCalorica } from '../CalculadoraCalorica';
 import { ZoomablePlanImage } from '../ImageZoomLightbox';
@@ -58,6 +69,7 @@ import {
   Users,
   X,
   History,
+  KeyRound,
   Play,
   Pause,
   Volume2,
@@ -72,6 +84,8 @@ interface EvaluadoDashboardProps {
   planesNutricion?: PlanNutricion[];
   planesEntrenamiento?: PlanEntrenamiento[];
   alimentosCalculadora?: FoodItem[];
+  /** Solo el evaluado dueño de la ficha (no el admin inspeccionando). */
+  canManagePin?: boolean;
 }
 
 export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({ 
@@ -80,6 +94,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
   planesNutricion = MOCK_PLANES_NUTRICION,
   planesEntrenamiento = MOCK_PLANES_ENTRENAMIENTO,
   alimentosCalculadora = FOOD_DATABASE,
+  canManagePin = false,
 }) => {
   const [modalSomatotipo, setModalSomatotipo] = useState<SomatotipoDefinicion | null>(null);
   const [modalGuiaAbierto, setModalGuiaAbierto] = useState(false);
@@ -94,13 +109,49 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
   const [audioPlaying, setAudioPlaying] = useState(false);
   const [audioMuted, setAudioMuted] = useState(false);
   const [matrizSomatotiposAbierta, setMatrizSomatotiposAbierta] = useState(false);
+  const [modalPinAbierto, setModalPinAbierto] = useState(false);
+  const [impactoValor, setImpactoValor] = useState(DEFAULT_CREDITOS.impactoValor);
+  const [impactoTexto, setImpactoTexto] = useState(DEFAULT_CREDITOS.impactoTexto);
+  const [frase1, setFrase1] = useState(DEFAULT_CREDITOS.frase1);
+  const [frase1Color, setFrase1Color] = useState(DEFAULT_CREDITOS.frase1Color);
+  const [frase2, setFrase2] = useState(DEFAULT_CREDITOS.frase2);
+  const [frase2Color, setFrase2Color] = useState(DEFAULT_CREDITOS.frase2Color);
 
   // Historial: índice 0 = medición más reciente
   const [medIndex, setMedIndex] = useState(0);
+  const [showLevelUp, setShowLevelUp] = useState(false);
+  const levelUpShownRef = useRef<string>('');
 
   useEffect(() => {
     setMedIndex(0);
   }, [user.cedula, user.mediciones.length]);
+
+  useEffect(() => {
+    getCreditosConfig()
+      .then((c) => {
+        setImpactoValor(c.impactoValor);
+        setImpactoTexto(c.impactoTexto);
+        setFrase1(c.frase1);
+        setFrase1Color(c.frase1Color);
+        setFrase2(c.frase2);
+        setFrase2Color(c.frase2Color);
+      })
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    const actual = user.mediciones[0];
+    const prev = user.mediciones[1];
+    if (!actual || !prev) return;
+    const nivelOf = (s: number) => (s >= 85 ? 3 : s >= 70 ? 2 : 1);
+    const nAct = nivelOf(actual.inbodyScore);
+    const nPrev = nivelOf(prev.inbodyScore);
+    const key = `${user.cedula}:${actual.id}:${nAct}`;
+    if (nAct > nPrev && levelUpShownRef.current !== key) {
+      levelUpShownRef.current = key;
+      setShowLevelUp(true);
+    }
+  }, [user.cedula, user.mediciones]);
 
   // Modal para parámetros metabólicos (Grasa Visceral, TMB, Ingesta Calórica, etc.)
   const [metabolicoModal, setMetabolicoModal] = useState<{
@@ -181,14 +232,29 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
           </div>
         </div>
 
-        {onBack && (
-          <button
-            onClick={onBack}
-            className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-850 hover:bg-slate-800 border border-slate-700 text-xs font-bold text-slate-200 transition-colors cursor-pointer"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Volver a la Lista de Efectivos</span>
-          </button>
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+          {canManagePin && (
+            <button
+              type="button"
+              onClick={() => setModalPinAbierto(true)}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-black uppercase tracking-wider cursor-pointer"
+            >
+              <KeyRound className="w-4 h-4" />
+              Cambiar PIN de seguridad
+            </button>
+          )}
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-850 hover:bg-slate-800 border border-slate-700 text-xs font-bold text-slate-200 transition-colors cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Volver a la Lista de Efectivos</span>
+            </button>
+          )}
+        </div>
+        {modalPinAbierto && (
+          <CambiarPinModal cedula={user.cedula} onClose={() => setModalPinAbierto(false)} />
         )}
       </div>
     );
@@ -197,6 +263,10 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
   const edad = calculateAge(user.fechaNacimiento);
   const tiempoServicio = calculateTimeInService(user.fechaIngreso);
   const score = medActual.inbodyScore;
+  const deltasHistorial = medAnterior ? buildDeltasHistorial(medActual, medAnterior) : [];
+  const frasesHistorial = medAnterior
+    ? buildFrasesMotivacion(medActual, medAnterior, deltasHistorial)
+    : [];
 
   // Clasificación en 3 Niveles (Nivel 1: Bajo, Nivel 2: Medio, Nivel 3: Alto)
   let nivelNumero = 1;
@@ -348,6 +418,11 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
 
   return (
     <div className="space-y-8 pb-16">
+      <LevelUpConfetti
+        show={showLevelUp}
+        nivel={nivelNumero}
+        onDone={() => setShowLevelUp(false)}
+      />
       
       {/* Botón de Regreso si se está inspeccionando desde otro rol */}
       {onBack && (
@@ -434,79 +509,41 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
               <div><span className={`font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Viendo:</span> {medActual.fecha}{safeMedIndex === 0 ? ' (actual)' : ''}</div>
             </div>
 
-            {/* Historial de mediciones InBody */}
-            {user.mediciones.length > 0 && (
-              <div className={`mt-4 p-3 rounded-2xl border ${
-                isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200'
-              }`}>
-                <div className="flex flex-wrap items-center gap-2 mb-2">
-                  <History className={`w-3.5 h-3.5 ${isDark ? 'text-cyan-400' : 'text-cyan-600'}`} />
-                  <span className={`text-[10px] font-black uppercase tracking-wider ${isDark ? 'text-cyan-400' : 'text-cyan-700'}`}>
-                    Historial InBody ({user.mediciones.length} toma{user.mediciones.length === 1 ? '' : 's'})
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {user.mediciones.map((m, i) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => setMedIndex(i)}
-                      className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border transition-all cursor-pointer ${
-                        i === safeMedIndex
-                          ? 'bg-blue-600 text-white border-blue-500 shadow-md shadow-blue-600/30'
-                          : isDark
-                            ? 'bg-slate-900 text-slate-300 border-slate-700 hover:border-blue-500/50'
-                            : 'bg-white text-slate-700 border-slate-300 hover:border-blue-400'
-                      }`}
-                    >
-                      {i === 0 ? 'Actual · ' : `#${i + 1} · `}{m.fecha}
-                      <span className="ml-1.5 opacity-80 font-mono">{m.inbodyScore}</span>
-                    </button>
-                  ))}
-                </div>
-
-                {medAnterior && (
-                  <div className={`mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] ${
-                    isDark ? 'text-slate-300' : 'text-slate-700'
-                  }`}>
-                    {[
-                      { label: 'Score', actual: medActual.inbodyScore, prev: medAnterior.inbodyScore, better: 'up' as const },
-                      { label: 'Peso (kg)', actual: medActual.peso, prev: medAnterior.peso, better: 'down' as const },
-                      { label: '% Grasa', actual: medActual.pctGrasa, prev: medAnterior.pctGrasa, better: 'down' as const },
-                      { label: 'Músculo (kg)', actual: medActual.musculoKg, prev: medAnterior.musculoKg, better: 'up' as const },
-                    ].map((item) => {
-                      const delta = Number((item.actual - item.prev).toFixed(1));
-                      const improved = item.better === 'up' ? delta > 0 : delta < 0;
-                      const worsened = item.better === 'up' ? delta < 0 : delta > 0;
-                      const Icon = delta === 0 ? Minus : delta > 0 ? TrendingUp : TrendingDown;
-                      return (
-                        <div
-                          key={item.label}
-                          className={`rounded-xl border px-2.5 py-2 ${
-                            isDark ? 'border-slate-800 bg-slate-900/80' : 'border-slate-200 bg-white'
-                          }`}
-                        >
-                          <div className={`text-[9px] font-bold uppercase ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                            vs {medAnterior.fecha}
-                          </div>
-                          <div className="font-bold mt-0.5">{item.label}</div>
-                          <div className={`flex items-center gap-1 mt-0.5 font-mono font-black ${
-                            improved ? 'text-emerald-400' : worsened ? 'text-rose-400' : 'text-slate-400'
-                          }`}>
-                            <Icon className="w-3 h-3" />
-                            <span>{delta > 0 ? '+' : ''}{delta}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
           </div>
 
-          {/* Peso Actual y Botón de Guía Técnica */}
-          <div className="flex flex-wrap items-center gap-3 shrink-0">
+          {/* PIN, guía y peso actual */}
+          <div className="flex flex-col sm:flex-row lg:flex-col items-stretch gap-3 shrink-0 w-full lg:w-auto">
+            <div className="flex flex-col sm:flex-row lg:flex-col gap-2">
+              {canManagePin && (
+                <button
+                  type="button"
+                  onClick={() => setModalPinAbierto(true)}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-bold text-[10px] uppercase tracking-wide transition-all shadow-md shadow-orange-500/15 cursor-pointer border border-orange-400/30"
+                >
+                  <KeyRound className="w-3.5 h-3.5 shrink-0" />
+                  <div className="text-left leading-tight">
+                    <span className="block text-[8px] text-orange-100 font-normal normal-case tracking-normal">
+                      Seguridad
+                    </span>
+                    <span>Cambiar PIN</span>
+                  </div>
+                </button>
+              )}
+              <button
+                onClick={() => setModalGuiaAbierto(true)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-[10px] uppercase tracking-wide transition-all shadow-md shadow-blue-500/15 cursor-pointer border border-blue-400/30 group"
+                title="Abrir Documento Guía Oficial de Parámetros InBody"
+              >
+                <BookOpen className="w-3.5 h-3.5 text-cyan-300 group-hover:scale-110 transition-transform shrink-0" />
+                <div className="text-left leading-tight">
+                  <span className="block text-[8px] text-blue-200 font-normal normal-case tracking-normal">
+                    Manual técnico
+                  </span>
+                  <span>Documento guía</span>
+                </div>
+              </button>
+            </div>
+
             <div className={`${subCardCls} border p-4 sm:p-5 rounded-2xl flex items-center gap-4`}>
               <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500 border border-blue-500/20">
                 <Scale className="w-6 h-6" />
@@ -521,19 +558,105 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
                 </span>
               </div>
             </div>
-
-            <button
-              onClick={() => setModalGuiaAbierto(true)}
-              className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold text-xs uppercase tracking-wider transition-all shadow-lg shadow-blue-500/20 cursor-pointer border border-blue-400/30 group"
-              title="Abrir Documento Guía Oficial de Parámetros InBody"
-            >
-              <BookOpen className="w-4 h-4 text-cyan-300 group-hover:scale-110 transition-transform" />
-              <div className="text-left">
-                <span className="block text-[9px] text-blue-200 font-normal normal-case">Manual Técnico</span>
-                <span>Documento Guía</span>
-              </div>
-            </button>
           </div>
+        </div>
+
+        {/* Historial + semáforo de evolución */}
+        {user.mediciones.length > 0 && (
+          <div className={`mt-6 p-4 rounded-2xl border ${
+            isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200'
+          }`}>
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <History className={`w-3.5 h-3.5 ${isDark ? 'text-cyan-400' : 'text-cyan-600'}`} />
+              <span className={`text-[10px] font-black uppercase tracking-wider ${isDark ? 'text-cyan-400' : 'text-cyan-700'}`}>
+                Historial InBody ({user.mediciones.length} toma{user.mediciones.length === 1 ? '' : 's'})
+              </span>
+              {user.mediciones.length >= 2 && (
+                <span className={`text-[10px] font-bold ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
+                  <span className="text-emerald-400">● Verde mejora</span>
+                  {' · '}
+                  <span className="text-amber-400">● Amarillo se mantiene</span>
+                  {' · '}
+                  <span className="text-rose-400">● Rojo baja</span>
+                </span>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {user.mediciones.map((m, i) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => setMedIndex(i)}
+                  className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border transition-all cursor-pointer ${
+                    i === safeMedIndex
+                      ? 'bg-blue-600 text-white border-blue-500 shadow-md shadow-blue-600/30'
+                      : isDark
+                        ? 'bg-slate-900 text-slate-300 border-slate-700 hover:border-blue-500/50'
+                        : 'bg-white text-slate-700 border-slate-300 hover:border-blue-400'
+                  }`}
+                >
+                  {i === 0 ? 'Actual · ' : `#${i + 1} · `}{m.fecha}
+                  <span className="ml-1.5 opacity-80 font-mono">{m.inbodyScore}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {medAnterior ? (
+                <>
+                  <div className={`grid grid-cols-2 lg:grid-cols-4 gap-2 text-[11px] ${
+                    isDark ? 'text-slate-300' : 'text-slate-700'
+                  }`}>
+                    {deltasHistorial.map((item) => {
+                      const ui = SEMAFORO_UI[item.nivel];
+                      const Icon = item.delta === 0 ? Minus : item.delta > 0 ? TrendingUp : TrendingDown;
+                      return (
+                        <div
+                          key={item.key}
+                          className={`rounded-xl border px-2.5 py-2 ${ui.bg} ${ui.border}`}
+                        >
+                          <div className={`text-[9px] font-bold uppercase ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                            vs {medAnterior.fecha}
+                          </div>
+                          <div className="font-bold mt-0.5 flex items-center gap-1.5">
+                            <span className={`inline-block w-2 h-2 rounded-full ${ui.dot}`} />
+                            {item.label}
+                          </div>
+                          <div className={`flex items-center gap-1 mt-0.5 font-mono font-black ${ui.text}`}>
+                            <Icon className="w-3 h-3" />
+                            <span>{formatDelta(item.delta)}{item.unidad}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {frasesHistorial.map((frase) => {
+                      const ui = SEMAFORO_UI[frase.nivel];
+                      return (
+                        <div
+                          key={frase.key}
+                          className={`flex items-start gap-2 rounded-xl border px-3 py-2 ${ui.bg} ${ui.border}`}
+                        >
+                          <span className={`mt-1.5 inline-block w-2.5 h-2.5 rounded-full shrink-0 ${ui.dot}`} />
+                          <p className={`text-[11px] leading-snug ${ui.text}`}>
+                            <span className={`inline-flex mr-1.5 px-1.5 py-0.5 rounded-md border text-[9px] font-black uppercase tracking-wide ${ui.chip}`}>
+                              {frase.label}
+                            </span>
+                            {frase.texto}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              ) : null}
+            </div>
+          </div>
+        )}
+
+        <div className="mt-4 pt-1">
+          <PillarPills isDark={isDark} centered />
         </div>
       </div>
 
@@ -1331,9 +1454,9 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
               </div>
             </div>
 
-            <div className={`p-5 border-t ${isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+            <div className={`p-5 border-t space-y-3 ${isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
               {planesEntrenamientoUsuario.length > 1 && (
-                <p className={`text-[10px] mb-2 text-center ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                <p className={`text-[10px] text-center ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                   {planesEntrenamientoUsuario.length} planes disponibles para tu somatotipo / edad / sexo — elige al abrir
                 </p>
               )}
@@ -1705,6 +1828,18 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
 
         </div>
       </div>
+
+      <ImpactCounter
+        value={impactoValor}
+        texto={impactoTexto}
+        isDark={isDark}
+        runWhenVisible
+        withMissionPhrases
+        frase1={frase1}
+        frase1Color={frase1Color}
+        frase2={frase2}
+        frase2Color={frase2Color}
+      />
 
       {/* MODAL DETALLADO DE PARÁMETROS METABÓLICOS */}
       {metabolicoModal && (
@@ -2128,13 +2263,19 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
                   </>
                 )}
 
-                <div className="flex justify-end pt-2 border-t border-slate-800">
-                  <button
-                    onClick={cerrarModalEntrenamiento}
-                    className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs uppercase tracking-wider cursor-pointer"
-                  >
-                    Cerrar · Regresar a mi Ficha
-                  </button>
+                <div className="space-y-3 pt-2 border-t border-slate-800">
+                  <p className="text-[10px] leading-relaxed text-center text-orange-200/85">
+                    Entrena con seguridad: suspende el ejercicio ante dolor, mareo o malestar. Adapta el
+                    volumen a tu nivel y consulta a un profesional cuando exista una condición médica.
+                  </p>
+                  <div className="flex justify-end">
+                    <button
+                      onClick={cerrarModalEntrenamiento}
+                      className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs uppercase tracking-wider cursor-pointer"
+                    >
+                      Cerrar · Regresar a mi Ficha
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2155,6 +2296,10 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
         isOpen={modalGuiaAbierto}
         onClose={() => setModalGuiaAbierto(false)}
       />
+
+      {modalPinAbierto && (
+        <CambiarPinModal cedula={user.cedula} onClose={() => setModalPinAbierto(false)} />
+      )}
 
     </div>
   );

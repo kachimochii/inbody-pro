@@ -1031,6 +1031,11 @@ export const EntrenadorDashboard: React.FC<EntrenadorDashboardProps> = ({
                       </ul>
                     </div>
                   )}
+
+                  <p className="text-[10px] leading-relaxed text-center text-orange-200/85 pt-1">
+                    Entrena con seguridad: suspende el ejercicio ante dolor, mareo o malestar. Adapta el
+                    volumen a tu nivel y consulta a un profesional cuando exista una condición médica.
+                  </p>
                 </div>
               </div>
             </div>

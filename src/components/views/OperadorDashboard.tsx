@@ -138,8 +138,7 @@ export const OperadorDashboard: React.FC<OperadorDashboardProps> = ({
       {
         id: 'row-01',
         cedula: '1712345678', // Mayor Carlos Mendoza
-        nombreDetectado: 'Mayor Carlos Mendoza',
-        apellidosDetectados: 'Mendoza Andrade',
+        nombreDetectado: 'Carlos Mendoza Andrade',
         gradoDetectado: 'Mayor',
         sexoDetectado: 'M',
         unidadDetectada: 'Brigada de Fuerzas Especiales N° 9 Patria',
@@ -154,8 +153,7 @@ export const OperadorDashboard: React.FC<OperadorDashboardProps> = ({
       {
         id: 'row-02',
         cedula: '1719283746', // Edison Chávez
-        nombreDetectado: 'Cabo Segundo Edison Chávez',
-        apellidosDetectados: 'Chávez Morales',
+        nombreDetectado: 'Edison Chávez Morales',
         gradoDetectado: 'Cabo Segundo',
         sexoDetectado: 'M',
         unidadDetectada: 'Brigada de Infantería N° 1 El Oro',
@@ -170,8 +168,7 @@ export const OperadorDashboard: React.FC<OperadorDashboardProps> = ({
       {
         id: 'row-03',
         cedula: '0918273645', // Andrea Morales
-        nombreDetectado: 'Capitán Andrea Morales',
-        apellidosDetectados: 'Morales Vaca',
+        nombreDetectado: 'Andrea Morales Vaca',
         gradoDetectado: 'Capitán',
         sexoDetectado: 'F',
         unidadDetectada: 'Comando de Operaciones Aéreas y Defensa',
@@ -186,8 +183,7 @@ export const OperadorDashboard: React.FC<OperadorDashboardProps> = ({
       {
         id: 'row-04',
         cedula: '1720304050', // Nuevo Soldado
-        nombreDetectado: 'Soldado Juan Sebastián Pérez',
-        apellidosDetectados: 'Pérez Loor',
+        nombreDetectado: 'Juan Sebastián Pérez Loor',
         gradoDetectado: 'Soldado',
         sexoDetectado: 'M',
         unidadDetectada: 'Escuela de Formación de Soldados Vencedores del Cenepa',

@@ -1,10 +1,14 @@
 rules_version = '2';
-// Pegar en: Firebase Console → Storage → Reglas → Publicar
-// (NO va en Firestore. Son paneles distintos.)
 service firebase.storage {
   match /b/{bucket}/o {
+    // Lectura pública: fondos/planes deben verse también en el login (sin sesión).
+    // Escritura: solo staff autenticado con claim de rol.
     match /inbody/{allPaths=**} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if request.auth != null
+        && request.auth.token.role in ['admin', 'entrenador', 'nutricionista']
+        && request.resource.size < 8 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
     }
   }
 }

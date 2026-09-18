@@ -13,6 +13,7 @@ import { NutricionistaDashboard } from './NutricionistaDashboard';
 import { EntrenadorDashboard } from './EntrenadorDashboard';
 import { OperadorDashboard } from './OperadorDashboard';
 import { AdminSecurityPanel } from './AdminSecurityPanel';
+import { AparienciaManager } from '../AparienciaManager';
 import { downloadInbodyTemplate } from '../../utils/templateCsv';
 import { calculateAge } from '../../utils/inbodyCalculations';
 import {
@@ -43,6 +44,7 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  Image as ImageIcon,
 } from 'lucide-react';
 
 const SCORE_RANGES = [
@@ -160,7 +162,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onExportRosterCsv,
   onSearchCedula
 }) => {
-  const [adminTab, setAdminTab] = useState<'PERSONAL' | 'IMPORTAR' | 'NUTRICION' | 'ENTRENAMIENTO' | 'SEGURIDAD'>('PERSONAL');
+  const [adminTab, setAdminTab] = useState<
+    'PERSONAL' | 'IMPORTAR' | 'NUTRICION' | 'ENTRENAMIENTO' | 'SEGURIDAD' | 'APARIENCIA'
+  >('PERSONAL');
   const [searchTerm, setSearchTerm] = useState('');
   const [cedulaQuick, setCedulaQuick] = useState('');
   const [filterJerarquia, setFilterJerarquia] = useState<'unidad' | 'padre' | 'abuelo'>('unidad');
@@ -391,6 +395,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <Shield className="w-4 h-4" />
             <span>Seguridad</span>
           </button>
+
+          <button
+            onClick={() => setAdminTab('APARIENCIA')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              adminTab === 'APARIENCIA'
+                ? 'bg-cyan-600 text-white shadow-md shadow-cyan-600/30'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <ImageIcon className="w-4 h-4" />
+            <span>Apariencia</span>
+          </button>
         </div>
       </div>
 
@@ -435,9 +451,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
             </div>
             {rosterLoading && (
-              <p className="text-[11px] text-cyan-400 font-mono">
-                Consultando Firestore… {rosterProgress > 0 ? `${rosterProgress.toLocaleString()} exportados` : 'espere'}
-              </p>
+              <div className="space-y-2 pt-2">
+                <p className="text-[11px] text-cyan-400 font-mono">
+                  Consultando Firestore… {rosterProgress > 0 ? `${rosterProgress.toLocaleString()} exportados` : 'espere'}
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="h-16 rounded-2xl border border-slate-800 bg-slate-950/80 overflow-hidden relative"
+                    >
+                      <div
+                        className="absolute inset-0 -translate-x-full animate-[shimmer_1.4s_infinite] bg-gradient-to-r from-transparent via-slate-700/30 to-transparent"
+                        style={{ animationDelay: `${i * 0.1}s` }}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <style>{`
+                  @keyframes shimmer {
+                    100% { transform: translateX(100%); }
+                  }
+                `}</style>
+              </div>
             )}
             {rosterLoaded && (
               <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-800">
@@ -966,6 +1002,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           )}
         />
       )}
+
+      {adminTab === 'APARIENCIA' && <AparienciaManager />}
 
     </div>
   );

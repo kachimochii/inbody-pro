@@ -35,6 +35,10 @@ import {
 import { EVALUADOS_INBODY_REALES } from '../data/inbodyEvaluados';
 import { expandUnidadesPorJerarquia, hasInbodyData } from './unidadesCatalog';
 import type { FoodCategory, FoodItem, MealData } from '../data/foodDatabase';
+import {
+  BaremosConfig,
+  normalizeBaremosConfig,
+} from '../utils/composicionCorporal';
 
 /** Campos oficiales de usuario en Firestore (escalafón limpio). */
 export const FIRESTORE_USER_FIELDS = [
@@ -260,7 +264,7 @@ function unidadCodesForFilter(filters: RosterQueryFilters): string[] | null {
 /** Sube imagen a Firebase Storage y devuelve URL pública. */
 export async function uploadImageToStorage(
   file: File,
-  folder: 'portadas' | 'guias' | 'nutricion' | 'otros' = 'otros'
+  folder: 'portadas' | 'guias' | 'nutricion' | 'fondos' | 'otros' = 'otros'
 ): Promise<string> {
   if (!file || file.size === 0) {
     throw new Error('Archivo vacío.');
@@ -336,7 +340,7 @@ export async function uploadImageToStorage(
 
 export async function uploadDataUrlToStorage(
   dataUrl: string,
-  folder: 'portadas' | 'guias' | 'nutricion' | 'otros' = 'otros',
+  folder: 'portadas' | 'guias' | 'nutricion' | 'fondos' | 'otros' = 'otros',
   filename = 'imagen.jpg'
 ): Promise<string> {
   const res = await fetch(dataUrl);
@@ -891,6 +895,27 @@ export async function saveDiarioCalorico(
       date: record.date,
       mode: record.mode,
       meals: record.meals,
+      updatedAt: new Date().toISOString(),
+    },
+    { merge: false }
+  );
+}
+
+const DOC_BAREMOS = doc(db, 'config', 'baremosEdadCorporal');
+
+/** Baremos de edad corporal / semáforo (grasa + músculo). */
+export async function getBaremosConfig(): Promise<BaremosConfig> {
+  const snap = await getDoc(DOC_BAREMOS);
+  if (!snap.exists()) return normalizeBaremosConfig(null);
+  return normalizeBaremosConfig(snap.data() as Partial<BaremosConfig>);
+}
+
+export async function saveBaremosConfig(cfg: BaremosConfig): Promise<void> {
+  const normalized = normalizeBaremosConfig(cfg);
+  await setDoc(
+    DOC_BAREMOS,
+    {
+      ...normalized,
       updatedAt: new Date().toISOString(),
     },
     { merge: false }

@@ -2,14 +2,18 @@ import React, { useEffect, useState } from 'react';
 import {
   CredencialCuenta,
   SeguridadConfig,
-  listCredencialesPrivilegiadas,
-  changePassword,
   getSeguridadConfig,
   saveSeguridadConfig,
-  ensureCredencial,
+  listarCredencialesPrivilegiadas,
+  listarSolicitudesResetPin,
+  adminResetPasswordLocal,
+  adminAutorizarPinLocal,
+  adminRechazarPinLocal,
 } from '../../lib/authCredentials';
+import { PinResetSolicitud } from '../../lib/userPin';
 import { UserAccount, UserRole } from '../../types/inbody';
-import { Shield, Phone, KeyRound, RefreshCw, Save, Eye, EyeOff } from 'lucide-react';
+import { auth } from '../../lib/firebase';
+import { Shield, Phone, KeyRound, RefreshCw, Save, Check, X, Unlock } from 'lucide-react';
 
 interface AdminSecurityPanelProps {
   staffUsers: UserAccount[];
@@ -24,6 +28,8 @@ const ROLE_LABEL: Record<string, string> = {
 
 export const AdminSecurityPanel: React.FC<AdminSecurityPanelProps> = ({ staffUsers }) => {
   const [creds, setCreds] = useState<CredencialCuenta[]>([]);
+  const [pinSolicitudes, setPinSolicitudes] = useState<PinResetSolicitud[]>([]);
+  const [pinManualCedula, setPinManualCedula] = useState('');
   const [cfg, setCfg] = useState<SeguridadConfig>({
     telefonoContactoAdmin: '',
     mensajeRecuperacion: 'Si olvidó su contraseña, comuníquese con el administrador institucional.',
@@ -31,38 +37,30 @@ export const AdminSecurityPanel: React.FC<AdminSecurityPanelProps> = ({ staffUse
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
-  const [showPass, setShowPass] = useState<Record<string, boolean>>({});
   const [editPass, setEditPass] = useState<Record<string, string>>({});
 
   const reload = async () => {
     setLoading(true);
     setErr('');
     try {
-      const uniqueStaff = Array.from(
-        new Map(
-          staffUsers
-            .filter((x) => x && x.role && x.role !== 'usuario' && x.cedula)
-            .map((u) => [u.cedula, u])
-        ).values()
-      );
-
-      for (const u of uniqueStaff) {
-        await ensureCredencial(u.cedula, u.role as UserRole, u.nombres.trim());
+      if (!auth.currentUser) {
+        throw new Error('Sesión no activa. Cierre sesión e ingrese de nuevo como administrador.');
       }
+      await auth.currentUser.getIdToken(true);
 
-      // Asegura admin institucional
-      await ensureCredencial('0703887042', 'admin', 'REQUENA VIVANCO JOSÉ LEONARDO');
-
-      const [list, seguridad] = await Promise.all([
-        listCredencialesPrivilegiadas(),
-        getSeguridadConfig(),
-      ]);
+      const list = await listarCredencialesPrivilegiadas();
+      const seguridad = await getSeguridadConfig();
+      const pines = await listarSolicitudesResetPin();
       setCreds(list);
       setCfg(seguridad);
+      setPinSolicitudes(pines);
     } catch (e) {
       console.error(e);
+      const raw = e instanceof Error ? e.message : String(e);
       setErr(
-        'No se pudieron cargar credenciales. En Firebase → Firestore → Reglas, permita lectura/escritura en las colecciones `credenciales` y `config`.'
+        /permission|insufficient|Missing or insufficient/i.test(raw)
+          ? 'Sin permiso para leer credenciales. Publique las reglas de Firestore (npm.cmd run firebase:deploy:rules) e inicie sesión otra vez.'
+          : raw || 'No se pudieron cargar las credenciales.'
       );
     } finally {
       setLoading(false);
@@ -91,7 +89,7 @@ export const AdminSecurityPanel: React.FC<AdminSecurityPanelProps> = ({ staffUse
       return;
     }
     try {
-      await changePassword(cedula, pass, { mustChangePassword: false, role });
+      await adminResetPasswordLocal(cedula, pass, role);
       setMsg(`Contraseña actualizada para ${cedula}`);
       setEditPass((p) => ({ ...p, [cedula]: '' }));
       await reload();
@@ -99,6 +97,48 @@ export const AdminSecurityPanel: React.FC<AdminSecurityPanelProps> = ({ staffUse
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Error al actualizar contraseña');
     }
+  };
+
+  const handleAuthorizePin = async (cedula: string, nombres?: string) => {
+    setErr('');
+    try {
+      await adminAutorizarPinLocal(cedula, nombres);
+      setMsg(`PIN autorizado para ${cedula}. En el próximo ingreso deberá crear uno nuevo.`);
+      await reload();
+      setTimeout(() => setMsg(''), 4000);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'No se pudo autorizar el PIN.');
+    }
+  };
+
+  const handleRejectPin = async (cedula: string) => {
+    setErr('');
+    try {
+      await adminRechazarPinLocal(cedula);
+      setMsg(`Solicitud de PIN rechazada para ${cedula}.`);
+      await reload();
+      setTimeout(() => setMsg(''), 3000);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'No se pudo rechazar la solicitud.');
+    }
+  };
+
+  const handleAuthorizePinManual = async () => {
+    const cedula = pinManualCedula.replace(/\D/g, '').padStart(10, '0').slice(-10);
+    if (cedula.length !== 10) {
+      setErr('Ingrese una cédula de 10 dígitos para autorizar el PIN.');
+      return;
+    }
+    const staff = staffUsers.find((u) => u.cedula === cedula);
+    await handleAuthorizePin(cedula, staff?.nombres);
+    setPinManualCedula('');
+  };
+
+  const pinStatusLabel: Record<string, { text: string; cls: string }> = {
+    pendiente: { text: 'Pendiente', cls: 'text-amber-400' },
+    autorizado: { text: 'Autorizado · espera PIN nuevo', cls: 'text-cyan-400' },
+    usado: { text: 'Ya creó PIN nuevo', cls: 'text-emerald-400' },
+    rechazado: { text: 'Rechazado', cls: 'text-slate-500' },
   };
 
   return (
@@ -110,7 +150,7 @@ export const AdminSecurityPanel: React.FC<AdminSecurityPanelProps> = ({ staffUse
         </div>
         <p className="text-xs text-slate-400">
           Roles privilegiados (admin, operador, entrenador, nutricionista). Primera vez la clave es la cédula y el sistema obliga a cambiarla.
-          Aquí puede ver/resetear claves y publicar un contacto de recuperación.
+          Las contraseñas ya no se muestran: solo hash. Aquí puede resetear claves y autorizar PIN.
         </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 rounded-2xl bg-slate-950 border border-slate-800">
@@ -148,6 +188,99 @@ export const AdminSecurityPanel: React.FC<AdminSecurityPanelProps> = ({ staffUse
         {msg && <p className="text-xs text-emerald-400 font-bold">{msg}</p>}
         {err && <p className="text-xs text-rose-400 font-bold">{err}</p>}
 
+        <div className="p-4 rounded-2xl bg-slate-950 border border-orange-500/20 space-y-3">
+          <div className="flex items-center gap-2">
+            <Unlock className="w-4 h-4 text-orange-400" />
+            <h3 className="text-sm font-black text-white uppercase tracking-wider">Reseteo de PIN (evaluados)</h3>
+          </div>
+          <p className="text-[11px] text-slate-400">
+            El evaluado pide ayuda desde el login. Usted autoriza y, en el siguiente ingreso, esa persona crea un PIN nuevo de 5 dígitos.
+            También puede autorizar por cédula si le avisaron en persona.
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={10}
+              value={pinManualCedula}
+              onChange={(e) => setPinManualCedula(e.target.value.replace(/\D/g, '').slice(0, 10))}
+              placeholder="Cédula 10 dígitos"
+              className="px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white font-mono outline-none w-44"
+            />
+            <button
+              type="button"
+              onClick={handleAuthorizePinManual}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-[11px] font-bold cursor-pointer"
+            >
+              <Unlock className="w-3.5 h-3.5" />
+              Autorizar PIN nuevo
+            </button>
+          </div>
+
+          <div className="overflow-x-auto rounded-2xl border border-slate-800">
+            <table className="w-full text-left text-xs text-slate-300">
+              <thead className="bg-slate-900 text-slate-400 uppercase text-[10px]">
+                <tr>
+                  <th className="p-3">Cédula</th>
+                  <th className="p-3">Nombre</th>
+                  <th className="p-3">Solicitado</th>
+                  <th className="p-3">Estado</th>
+                  <th className="p-3 text-right">Acción</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {pinSolicitudes.map((s) => {
+                  const st = pinStatusLabel[s.status] || pinStatusLabel.pendiente;
+                  return (
+                    <tr key={s.cedula}>
+                      <td className="p-3 font-mono">{s.cedula}</td>
+                      <td className="p-3">{s.nombres || '—'}</td>
+                      <td className="p-3 text-slate-400">
+                        {s.requestedAt ? new Date(s.requestedAt).toLocaleString('es-EC') : '—'}
+                      </td>
+                      <td className={`p-3 font-bold ${st.cls}`}>{st.text}</td>
+                      <td className="p-3 text-right">
+                        {(s.status === 'pendiente' || s.status === 'rechazado') && (
+                          <div className="inline-flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleAuthorizePin(s.cedula, s.nombres)}
+                              className="px-2 py-1 rounded-lg bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold cursor-pointer inline-flex items-center gap-1"
+                            >
+                              <Check className="w-3 h-3" />
+                              Autorizar
+                            </button>
+                            {s.status === 'pendiente' && (
+                              <button
+                                type="button"
+                                onClick={() => handleRejectPin(s.cedula)}
+                                className="px-2 py-1 rounded-lg bg-rose-600/20 text-rose-300 border border-rose-500/30 text-[10px] font-bold cursor-pointer inline-flex items-center gap-1"
+                              >
+                                <X className="w-3 h-3" />
+                                Rechazar
+                              </button>
+                            )}
+                          </div>
+                        )}
+                        {s.status === 'autorizado' && (
+                          <span className="text-[10px] text-cyan-400">Esperando que cree el PIN</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {pinSolicitudes.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="p-6 text-center text-slate-500">
+                      No hay solicitudes de reseteo de PIN.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-black text-white uppercase tracking-wider">Cuentas privilegiadas</h3>
           <button
@@ -181,19 +314,8 @@ export const AdminSecurityPanel: React.FC<AdminSecurityPanelProps> = ({ staffUse
                     <td className="p-3 font-mono">{c.cedula}</td>
                     <td className="p-3">{c.nombres || '—'}</td>
                     <td className="p-3">{ROLE_LABEL[c.role] || c.role}</td>
-                    <td className="p-3">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-mono">
-                          {showPass[c.cedula] ? c.passwordActual : '••••••••'}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setShowPass((s) => ({ ...s, [c.cedula]: !s[c.cedula] }))}
-                          className="text-slate-400 hover:text-white cursor-pointer"
-                        >
-                          {showPass[c.cedula] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                        </button>
-                      </div>
+                    <td className="p-3 text-slate-400 font-mono text-[11px]">
+                      {c.hasPassword === false ? 'Sin clave' : 'Hash almacenado'}
                     </td>
                     <td className="p-3">
                       {c.mustChangePassword ? (

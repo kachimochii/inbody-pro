@@ -1,31 +1,64 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+    function tokenRole() {
+      return request.auth.token.role;
+    }
+    function tokenCedula() {
+      return request.auth.uid;
+    }
+    function isAdmin() {
+      return signedIn() && tokenRole() == 'admin';
+    }
+    function isOperador() {
+      return signedIn() && tokenRole() == 'operador';
+    }
+    function isEntrenador() {
+      return signedIn() && tokenRole() == 'entrenador';
+    }
+    function isNutricionista() {
+      return signedIn() && tokenRole() == 'nutricionista';
+    }
+
+    match /usuarios/{cedula} {
+      allow read: if isAdmin() || isOperador() || (signedIn() && tokenCedula() == cedula);
+      allow create, update: if isAdmin() || isOperador();
+      allow delete: if isAdmin();
+    }
+
+    match /credenciales/{cedula} {
+      // Solo admin (sesión Auth con claim role=admin). Login/PIN siguen por Cloud Functions.
+      allow read, write: if isAdmin();
+    }
+
+    match /config/{doc} {
+      // Apariencia/créditos públicos (login); el resto requiere sesión.
+      allow read: if signedIn() || doc == 'apariencia' || doc == 'creditos';
+      allow write: if isAdmin();
+    }
+
     match /planesEntrenamiento/{id} {
-      allow read, write: if true;
+      allow read: if signedIn();
+      allow write: if isAdmin() || isEntrenador();
     }
     match /planesNutricion/{id} {
-      allow read, write: if true;
+      allow read: if signedIn();
+      allow write: if isAdmin() || isNutricionista();
     }
     match /fichasEdad/{id} {
-      allow read, write: if true;
+      allow read: if signedIn();
+      allow write: if isAdmin() || isEntrenador();
     }
     match /alimentosCalculadora/{id} {
-      allow read, write: if true;
+      allow read: if signedIn();
+      allow write: if isAdmin() || isNutricionista();
     }
-    // Un doc por cédula; se sobrescribe cada día (sin historial).
+
     match /diarioCalorico/{cedula} {
-      allow read, write: if true;
-    }
-    // Login privilegiado + panel Admin → Seguridad
-    match /credenciales/{cedula} {
-      allow read, write: if true;
-    }
-    match /config/{doc} {
-      allow read, write: if true;
-    }
-    match /usuarios/{cedula} {
-      allow read, write: if true;
+      allow read, write: if isAdmin() || (signedIn() && tokenCedula() == cedula);
     }
   }
 }

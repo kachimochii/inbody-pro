@@ -3,6 +3,7 @@ import { SomatotipoTipo, RegionEcuador, PlanNutricion } from '../../types/inbody
 import { DEFINICIONES_SOMATOTIPOS, GALERIA_PLATOS_ECUADOR } from '../../data/mockData';
 import { FoodItem } from '../../data/foodDatabase';
 import { AlimentosCalculadoraManager } from '../AlimentosCalculadoraManager';
+import { BaremosEdadCorporalManager } from '../BaremosEdadCorporalManager';
 import { 
   Salad, 
   Plus, 
@@ -16,7 +17,8 @@ import {
   Filter,
   Sparkles,
   Copy,
-  Calculator
+  Calculator,
+  Activity
 } from 'lucide-react';
 
 interface NutricionistaDashboardProps {
@@ -42,7 +44,7 @@ export const NutricionistaDashboard: React.FC<NutricionistaDashboardProps> = ({
   onUpdateAlimento,
   onDeleteAlimento,
 }) => {
-  const [nutriTab, setNutriTab] = useState<'platos' | 'calculadora'>('platos');
+  const [nutriTab, setNutriTab] = useState<'platos' | 'calculadora' | 'baremos'>('platos');
   const [selectedSomatotipo, setSelectedSomatotipo] = useState<SomatotipoTipo | 'TODOS'>('TODOS');
   const [selectedRegion, setSelectedRegion] = useState<RegionEcuador | 'TODAS'>('TODAS');
   
@@ -219,7 +221,21 @@ export const NutricionistaDashboard: React.FC<NutricionistaDashboardProps> = ({
           <Calculator className="w-3.5 h-3.5" />
           Calculadora
         </button>
+        <button
+          type="button"
+          onClick={() => setNutriTab('baremos')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer transition-all ${
+            nutriTab === 'baremos'
+              ? 'bg-amber-600 text-white shadow-md shadow-amber-600/30'
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <Activity className="w-3.5 h-3.5" />
+          Baremos edad
+        </button>
       </div>
+
+      {nutriTab === 'baremos' && <BaremosEdadCorporalManager />}
 
       {nutriTab === 'calculadora' && onAddAlimento && onUpdateAlimento && onDeleteAlimento && (
         <AlimentosCalculadoraManager

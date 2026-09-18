@@ -1,45 +1,48 @@
 import React, { useState } from 'react';
-import { UserAccount, UserRole } from '../types/inbody';
+import { signInWithCustomToken } from 'firebase/auth';
+import { UserAccount } from '../types/inbody';
 import { FRASES_MANDO, CAPAS_BASE } from '../data/mockData';
-import {
-  isPrivilegedRole,
-  ensureCredencial,
-  verifyPassword,
-  changePassword,
-  getSeguridadConfig,
-} from '../lib/authCredentials';
+import { PIN_LENGTH, pinWeakReason } from '../lib/userPin';
+import { loginInbody, LoginInbodyResult, solicitarResetPinRemoto } from '../lib/authApi';
 import { fetchUserByCedula } from '../lib/firestoreService';
+import { auth } from '../lib/firebase';
 import { BrandLogo } from './BrandLogo';
+import { PinInput } from './PinInput';
 import { 
-  Shield, 
   KeyRound, 
   ArrowRight, 
   AlertCircle, 
-  Activity, 
-  Dumbbell, 
-  Salad, 
-  User,
   Lock,
   Phone
 } from 'lucide-react';
 
 interface LoginModalProps {
-  /** Usuarios locales (mock / ya cargados) para resolver rol rápido */
-  users: UserAccount[];
+  users?: UserAccount[];
   onLoginSuccess: (user: UserAccount) => void;
+  /** Marca el inicio del sign-in para que App no restaure sesión antes del video. */
+  onAuthSigningIn?: () => void;
+  /** Bloque bajo la tarjeta (contador, disclaimer, etc.). */
+  belowCard?: React.ReactNode;
 }
 
-/** Tiempo mínimo de la animación/frase al ingresar (ms) */
 const LOGIN_PHRASE_MIN_MS = 5000;
 
-export const LoginModal: React.FC<LoginModalProps> = ({ users, onLoginSuccess }) => {
+export const LoginModal: React.FC<LoginModalProps> = ({
+  onLoginSuccess,
+  onAuthSigningIn,
+  belowCard,
+}) => {
   const [cedulaInput, setCedulaInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [showPasswordField, setShowPasswordField] = useState(false);
+  const [showPinField, setShowPinField] = useState(false);
+  const [forceCreatePin, setForceCreatePin] = useState(false);
+  const [pinInput, setPinInput] = useState('');
+  const [newPin, setNewPin] = useState('');
+  const [newPin2, setNewPin2] = useState('');
   const [forceChange, setForceChange] = useState(false);
   const [newPass, setNewPass] = useState('');
   const [newPass2, setNewPass2] = useState('');
-  const [pendingUser, setPendingUser] = useState<UserAccount | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [infoMsg, setInfoMsg] = useState('');
@@ -53,36 +56,59 @@ export const LoginModal: React.FC<LoginModalProps> = ({ users, onLoginSuccess })
     }
   };
 
-  const resolveUser = async (cedula: string): Promise<UserAccount | null> => {
-    const local = users.find(
-      (u) => u.cedula === cedula || u.cedula.padStart(10, '0') === cedula.padStart(10, '0')
+  const resetSecurityFields = () => {
+    setShowPasswordField(false);
+    setShowPinField(false);
+    setForceCreatePin(false);
+    setForceChange(false);
+    setPasswordInput('');
+    setPinInput('');
+    setNewPin('');
+    setNewPin2('');
+  };
+
+  const applyStatus = (res: LoginInbodyResult) => {
+    if (res.contactoAdmin) setContactoAdmin(res.contactoAdmin);
+    if (res.message) setInfoMsg(res.message);
+    if (res.status === 'need_password') {
+      setShowPasswordField(true);
+      setShowPinField(false);
+      setForceCreatePin(false);
+    }
+    if (res.status === 'need_pin') {
+      setShowPinField(true);
+      setShowPasswordField(false);
+      setForceCreatePin(false);
+    }
+    if (res.status === 'create_pin') {
+      setForceCreatePin(true);
+      setShowPinField(false);
+      setShowPasswordField(false);
+    }
+    if (res.status === 'must_change_password') {
+      setForceChange(true);
+      setShowPasswordField(false);
+      // conservar passwordInput: se reenvía al guardar la nueva contraseña
+    }
+    if (res.status === 'locked') {
+      setShowPinField(true);
+      setErrorMsg(res.message || 'PIN bloqueado.');
+      setInfoMsg('');
+    }
+  };
+
+  const finishWithToken = async (token: string, cedula: string, startedAt: number) => {
+    onAuthSigningIn?.();
+    await signInWithCustomToken(auth, token);
+    await auth.currentUser?.getIdToken(true);
+    const user = await fetchUserByCedula(cedula);
+    if (!user) {
+      throw new Error('Sesión creada, pero no se pudo leer la ficha. Publique las reglas de Firestore.');
+    }
+    await waitForPhrase(startedAt);
+    onLoginSuccess(
+      user.cedula === '0703887042' ? { ...user, role: 'admin' as const } : user
     );
-    let remote: UserAccount | null = null;
-    try {
-      remote = await fetchUserByCedula(cedula);
-    } catch {
-      /* offline / reglas */
-    }
-    if (!local && !remote) return null;
-    if (!remote) return local!;
-    if (!local) {
-      // Admin institucional forzado
-      if (cedula === '0703887042') return { ...remote, role: 'admin' };
-      return remote;
-    }
-    // Prioriza mediciones con datos reales (Firebase hidratado o archivo InBody local)
-    const mediciones =
-      remote.mediciones?.length > 0
-        ? remote.mediciones
-        : local.mediciones?.length
-          ? local.mediciones
-          : [];
-    return {
-      ...local,
-      ...remote,
-      role: cedula === '0703887042' ? 'admin' : local.role !== 'usuario' ? local.role : remote.role,
-      mediciones,
-    };
   };
 
   const handleLogin = async () => {
@@ -113,84 +139,73 @@ export const LoginModal: React.FC<LoginModalProps> = ({ users, onLoginSuccess })
     const startedAt = Date.now();
 
     try {
-      const found = await resolveUser(targetCedula);
-      if (!found) {
-        setErrorMsg('Cédula no registrada. Verifique el número o solicite registro al administrador.');
-        setIsLoading(false);
+      const res = await loginInbody({
+        cedula: targetCedula,
+        pin: showPinField ? pinInput : undefined,
+        password: showPasswordField ? passwordInput : undefined,
+      });
+      if (res.status === 'ok' && res.token) {
+        await finishWithToken(res.token, targetCedula, startedAt);
         return;
       }
-
-      // Evaluado: entra solo con cédula
-      if (!isPrivilegedRole(found.role)) {
-        await waitForPhrase(startedAt);
-        onLoginSuccess(found);
-        setIsLoading(false);
-        return;
-      }
-
-      // Roles privilegiados: pedir contraseña
-      if (!showPasswordField) {
-        setShowPasswordField(true);
-        setPendingUser(found);
-        try {
-          const cfg = await getSeguridadConfig();
-          setContactoAdmin(cfg.telefonoContactoAdmin || '');
-        } catch { /* ignore */ }
-        setInfoMsg('Rol privilegiado detectado. Ingrese su contraseña (primera vez = su cédula).');
-        setIsLoading(false);
-        return;
-      }
-
-      const user = pendingUser || found;
-      let cred;
-      try {
-        cred = await ensureCredencial(
-          user.cedula,
-          user.role,
-          user.nombres.trim()
-        );
-      } catch (e) {
-        console.error('ensureCredencial', e);
-        const code = (e as { code?: string })?.code || '';
-        setErrorMsg(
-          code === 'permission-denied'
-            ? 'Firebase bloqueó credenciales (permission-denied). En Consola → Firestore → Reglas, permita read/write en `credenciales` y `config`, y pulse Publicar.'
-            : 'No se pudo validar credenciales en Firebase. Revise reglas de Firestore (colección credenciales).'
-        );
-        setIsLoading(false);
-        return;
-      }
-
-      if (!passwordInput) {
-        setErrorMsg('Ingrese la contraseña.');
-        setIsLoading(false);
-        return;
-      }
-
-      const ok = await verifyPassword(user.cedula, passwordInput);
-      if (!ok) {
-        setErrorMsg(
-          contactoAdmin
-            ? `Contraseña incorrecta. Si la olvidó, comuníquese con el administrador: ${contactoAdmin}`
-            : 'Contraseña incorrecta. Si la olvidó, comuníquese con el administrador institucional.'
-        );
-        setIsLoading(false);
-        return;
-      }
-
-      if (cred.mustChangePassword || passwordInput === user.cedula) {
-        setForceChange(true);
-        setPendingUser(user);
-        setInfoMsg('Debe cambiar su contraseña antes de continuar (ya no use la cédula).');
-        setIsLoading(false);
-        return;
-      }
-
-      await waitForPhrase(startedAt);
-      onLoginSuccess(user);
+      applyStatus(res);
     } catch (err) {
       console.error(err);
-      setErrorMsg('Error de autenticación. Intente de nuevo.');
+      setErrorMsg(err instanceof Error ? err.message : 'Error de autenticación. Intente de nuevo.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCreatePin = async () => {
+    setErrorMsg('');
+    const weak = pinWeakReason(newPin, cedulaInput);
+    if (weak) {
+      setErrorMsg(weak);
+      return;
+    }
+    if (newPin !== newPin2) {
+      setErrorMsg('El PIN y la confirmación no coinciden.');
+      return;
+    }
+    setIsLoading(true);
+    const startedAt = Date.now();
+    const randFrase = FRASES_MANDO[Math.floor(Math.random() * FRASES_MANDO.length)];
+    setFraseActual(randFrase);
+    try {
+      const res = await loginInbody({ cedula: cedulaInput.trim(), newPin });
+      if (res.status === 'ok' && res.token) {
+        await finishWithToken(res.token, cedulaInput.trim(), startedAt);
+        return;
+      }
+      applyStatus(res);
+    } catch (e) {
+      setErrorMsg(e instanceof Error ? e.message : 'No se pudo guardar el PIN.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleForgotPin = async () => {
+    setErrorMsg('');
+    const cedula = cedulaInput.trim();
+    if (cedula.length !== 10) {
+      setErrorMsg('Ingrese primero su cédula para solicitar el reseteo.');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const res = await solicitarResetPinRemoto(cedula);
+      const phone = res.contactoAdmin || contactoAdmin;
+      if (res.contactoAdmin) setContactoAdmin(res.contactoAdmin);
+      setInfoMsg(
+        phone
+          ? `Solicitud enviada. El administrador debe autorizar el reseteo. Contacto: ${phone}`
+          : 'Solicitud enviada. El administrador autorizará el reseteo en Seguridad. Luego vuelva a ingresar para crear un PIN nuevo.'
+      );
+      setShowPinField(true);
+    } catch (e) {
+      setErrorMsg(e instanceof Error ? e.message : 'No se pudo enviar la solicitud de reseteo.');
     } finally {
       setIsLoading(false);
     }
@@ -198,7 +213,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ users, onLoginSuccess })
 
   const handleChangePassword = async () => {
     setErrorMsg('');
-    if (!pendingUser) return;
     if (newPass.length < 6) {
       setErrorMsg('La nueva contraseña debe tener al menos 6 caracteres.');
       return;
@@ -207,7 +221,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ users, onLoginSuccess })
       setErrorMsg('Las contraseñas no coinciden.');
       return;
     }
-    if (newPass === pendingUser.cedula) {
+    if (newPass === cedulaInput.trim()) {
       setErrorMsg('No puede usar la cédula como contraseña definitiva.');
       return;
     }
@@ -216,13 +230,16 @@ export const LoginModal: React.FC<LoginModalProps> = ({ users, onLoginSuccess })
     const randFrase = FRASES_MANDO[Math.floor(Math.random() * FRASES_MANDO.length)];
     setFraseActual(randFrase);
     try {
-      await changePassword(pendingUser.cedula, newPass, {
-        mustChangePassword: false,
-        role: pendingUser.role,
-        nombres: pendingUser.nombres.trim(),
+      const res = await loginInbody({
+        cedula: cedulaInput.trim(),
+        password: passwordInput,
+        newPassword: newPass,
       });
-      await waitForPhrase(startedAt);
-      onLoginSuccess(pendingUser);
+      if (res.status === 'ok' && res.token) {
+        await finishWithToken(res.token, cedulaInput.trim(), startedAt);
+        return;
+      }
+      applyStatus(res);
     } catch (e) {
       setErrorMsg(e instanceof Error ? e.message : 'No se pudo guardar la contraseña.');
     } finally {
@@ -231,9 +248,18 @@ export const LoginModal: React.FC<LoginModalProps> = ({ users, onLoginSuccess })
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto">
-      <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden my-6">
+    <div className="relative z-10 w-full flex-1 flex flex-col items-center px-4 pt-6 pb-10 overflow-y-auto">
+      <div className="login-glow-card w-full max-w-lg bg-slate-900/92 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden backdrop-blur-sm">
         <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-600 via-cyan-400 to-indigo-600" />
+        <style>{`
+          @keyframes loginBorderPulse {
+            0%, 100% { box-shadow: 0 0 0 1px rgba(56,189,248,0.25), 0 0 24px rgba(37,99,235,0.12); }
+            50% { box-shadow: 0 0 0 1px rgba(34,211,238,0.55), 0 0 36px rgba(59,130,246,0.28); }
+          }
+          .login-glow-card {
+            animation: loginBorderPulse 4.5s ease-in-out infinite;
+          }
+        `}</style>
 
         <div className="text-center mb-6">
           <div className="mb-3 flex justify-center">
@@ -249,13 +275,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({ users, onLoginSuccess })
             </span>
           </div>
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-300 text-[11px] font-bold mt-2.5">
-            <Shield className="w-3 h-3" />
+            <img src="/EE.png" alt="" className="w-4 h-4 object-contain" />
             <span>Ejército Ecuatoriano</span>
           </div>
         </div>
 
         <div className="space-y-4">
-          {!forceChange && (
+          {!forceChange && !forceCreatePin && (
             <>
               <div>
                 <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 text-center">
@@ -272,9 +298,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ users, onLoginSuccess })
                       const raw = e.target.value;
                       const onlyDigits = raw.replace(/\D/g, '').slice(0, 10);
                       setCedulaInput(onlyDigits);
-                      setShowPasswordField(false);
-                      setPasswordInput('');
-                      setPendingUser(null);
+                      resetSecurityFields();
                       if (raw !== onlyDigits && raw.length > 0) {
                         setErrorMsg('Solo se permiten números. Se eliminaron caracteres no válidos.');
                       } else if (errorMsg) setErrorMsg('');
@@ -285,9 +309,17 @@ export const LoginModal: React.FC<LoginModalProps> = ({ users, onLoginSuccess })
                   />
                   <KeyRound className="w-5 h-5 text-slate-500 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1.5 text-center">
-                  Solo números • Exactamente 10 dígitos ({cedulaInput.length}/10)
-                </p>
+                <div className="mt-2.5 space-y-1">
+                  <div className="h-1.5 w-full rounded-full bg-slate-800 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-200"
+                      style={{ width: `${(cedulaInput.length / 10) * 100}%` }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-500 text-center">
+                    Solo números · {cedulaInput.length < 10 ? `Faltan ${10 - cedulaInput.length}` : 'Listo'}
+                  </p>
+                </div>
               </div>
 
               {showPasswordField && (
@@ -311,7 +343,49 @@ export const LoginModal: React.FC<LoginModalProps> = ({ users, onLoginSuccess })
                   )}
                 </div>
               )}
+
+              {showPinField && (
+                <div className="space-y-3">
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider text-center">
+                    PIN de seguridad ({PIN_LENGTH} dígitos)
+                  </label>
+                  <PinInput value={pinInput} onChange={setPinInput} autoFocus idPrefix="login-pin" onEnter={handleLogin} />
+                  <button
+                    type="button"
+                    onClick={handleForgotPin}
+                    className="w-full text-[11px] font-bold text-amber-300/90 hover:text-amber-200 cursor-pointer"
+                  >
+                    ¿Olvidó su PIN? Avisar al administrador
+                  </button>
+                </div>
+              )}
             </>
+          )}
+
+          {forceCreatePin && (
+            <div className="space-y-4 p-4 rounded-2xl bg-orange-500/10 border border-orange-500/30">
+              <p className="text-xs font-bold text-orange-200 text-center">Crear PIN de 5 dígitos</p>
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2 text-center">
+                  Nuevo PIN
+                </label>
+                <PinInput value={newPin} onChange={setNewPin} autoFocus idPrefix="create-pin" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2 text-center">
+                  Confirmar PIN
+                </label>
+                <PinInput value={newPin2} onChange={setNewPin2} idPrefix="create-pin2" />
+              </div>
+              <button
+                type="button"
+                onClick={handleCreatePin}
+                disabled={isLoading}
+                className="w-full py-3 bg-orange-600 hover:bg-orange-500 text-white font-black text-xs uppercase rounded-xl cursor-pointer"
+              >
+                Guardar PIN y entrar
+              </button>
+            </div>
           )}
 
           {forceChange && (
@@ -356,18 +430,24 @@ export const LoginModal: React.FC<LoginModalProps> = ({ users, onLoginSuccess })
             </div>
           )}
 
-          {!forceChange && (
+          {!forceChange && !forceCreatePin && (
             <button
               onClick={handleLogin}
               disabled={isLoading}
               className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-[0.99] text-white font-black text-sm uppercase tracking-wider rounded-xl shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
-              <span>{showPasswordField ? 'Validar contraseña' : 'Ingresar'}</span>
+              <span>
+                {showPasswordField ? 'Validar contraseña' : showPinField ? 'Validar PIN' : 'Ingresar'}
+              </span>
               <ArrowRight className="w-4 h-4" />
             </button>
           )}
         </div>
       </div>
+
+      {belowCard && (
+        <div className="w-full max-w-lg mt-5 space-y-3">{belowCard}</div>
+      )}
 
       {isLoading && (
         <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-lg">

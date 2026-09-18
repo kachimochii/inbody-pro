@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { UserAccount, UserRole, InBodyRecord, PlanNutricion, PlanEntrenamiento, FichaEdadCatalogo } from './types/inbody';
 import { MOCK_USUARIOS, MOCK_PLANES_NUTRICION, MOCK_PLANES_ENTRENAMIENTO } from './data/mockData';
 import { FOOD_DATABASE, FoodItem } from './data/foodDatabase';
@@ -18,6 +18,10 @@ import {
   getEstadoInBodyLabel,
   seedPlanesIfEmpty,
   seedAlimentosIfEmpty,
+  fetchPlanesEntrenamiento,
+  fetchPlanesNutricion,
+  fetchFichasEdad,
+  fetchAlimentosCalculadora,
   upsertPlanEntrenamiento,
   deletePlanEntrenamiento,
   upsertPlanNutricion,
@@ -29,17 +33,29 @@ import {
   saveUserRoleToFirestore,
   saveUserAccountToFirestore,
   appendMedicionToFirestore,
+  getBaremosConfig,
 } from './lib/firestoreService';
+import { setBaremosActivos } from './utils/composicionCorporal';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { HeaderNavbar } from './components/HeaderNavbar';
 import { LoginModal } from './components/LoginModal';
 import { SplashScreen } from './components/SplashScreen';
+import { MedicalDisclaimer } from './components/MedicalDisclaimer';
+import { ScrollToTopButton } from './components/ScrollToTopButton';
+import { CreditosInstitucionales } from './components/CreditosInstitucionales';
+import {
+  AparienciaConfig,
+  DEFAULT_APARIENCIA,
+  getAparienciaConfig,
+} from './lib/institucionalConfig';
 import { EvaluadoDashboard } from './components/views/EvaluadoDashboard';
 import { AdminDashboard } from './components/views/AdminDashboard';
 import { OperadorDashboard } from './components/views/OperadorDashboard';
 import { EntrenadorDashboard } from './components/views/EntrenadorDashboard';
 import { NutricionistaDashboard } from './components/views/NutricionistaDashboard';
 import { ArrowLeft, Shield, Cloud, CloudOff } from 'lucide-react';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { auth } from './lib/firebase';
 
 function MainAppContent() {
   const { isDark } = useTheme();
@@ -61,35 +77,111 @@ function MainAppContent() {
   const [inspectingUser, setInspectingUser] = useState<UserAccount | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [showSplash, setShowSplash] = useState(false);
+  const skipAuthRestoreRef = useRef(false);
   const [cloudReady, setCloudReady] = useState(false);
   const [cloudError, setCloudError] = useState<string | null>(null);
-  const [cloudLoading, setCloudLoading] = useState(true);
+  const [cloudLoading, setCloudLoading] = useState(false);
+  const [apariencia, setApariencia] = useState<AparienciaConfig>({ ...DEFAULT_APARIENCIA });
 
   const [planesNutricion, setPlanesNutricion] = useState<PlanNutricion[]>(MOCK_PLANES_NUTRICION);
   const [planesEntrenamiento, setPlanesEntrenamiento] = useState<PlanEntrenamiento[]>(MOCK_PLANES_ENTRENAMIENTO);
   const [fichasEdad, setFichasEdad] = useState<FichaEdadCatalogo[]>(DEFAULT_FICHAS_EDAD);
   const [alimentosCalculadora, setAlimentosCalculadora] = useState<FoodItem[]>(FOOD_DATABASE);
 
-  // Solo planes/fichas/alimentos — no descargar todos los usuarios
+  // Restaura sesión en segundo plano; no bloquea la pantalla de login.
   useEffect(() => {
+    getAparienciaConfig()
+      .then(setApariencia)
+      .catch(() => undefined);
+
+    const onApariencia = (ev: Event) => {
+      const detail = (ev as CustomEvent<AparienciaConfig>).detail;
+      if (detail) setApariencia(detail);
+    };
+    window.addEventListener('inbody-apariencia', onApariencia);
+    return () => window.removeEventListener('inbody-apariencia', onApariencia);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const unsub = onAuthStateChanged(auth, async (fbUser) => {
+      if (cancelled || !fbUser || isLoggedIn || skipAuthRestoreRef.current) return;
+      try {
+        const remote = await Promise.race([
+          fetchUserByCedula(fbUser.uid),
+          new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 4000)),
+        ]);
+        if (cancelled || !remote || skipAuthRestoreRef.current) return;
+        const fixed =
+          remote.cedula === '0703887042' ? { ...remote, role: 'admin' as UserRole } : remote;
+        setCurrentUser(fixed);
+        setCurrentRole(fixed.role);
+        setIsLoggedIn(true);
+      } catch (err) {
+        console.warn('No se pudo restaurar sesión', err);
+      }
+    });
+    return () => {
+      cancelled = true;
+      unsub();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Catálogos solo con sesión (las reglas ya no permiten lectura anónima)
+  useEffect(() => {
+    if (!isLoggedIn || !currentUser) return;
     let cancelled = false;
     (async () => {
       setCloudLoading(true);
       try {
-        const seeded = await seedPlanesIfEmpty(
-          MOCK_PLANES_ENTRENAMIENTO,
-          DEFAULT_FICHAS_EDAD,
-          MOCK_PLANES_NUTRICION
-        );
-        const alimentos = await seedAlimentosIfEmpty(FOOD_DATABASE);
+        try {
+          const baremos = await getBaremosConfig();
+          if (!cancelled) setBaremosActivos(baremos);
+        } catch (baremoErr) {
+          console.warn('Baremos: usando valores por defecto', baremoErr);
+        }
+
+        const canSeed =
+          currentUser.role === 'admin' ||
+          currentUser.role === 'entrenador' ||
+          currentUser.role === 'nutricionista';
+
+        let planes = MOCK_PLANES_ENTRENAMIENTO;
+        let fichas = DEFAULT_FICHAS_EDAD;
+        let nutri = MOCK_PLANES_NUTRICION;
+        let alimentos = FOOD_DATABASE;
+
+        if (canSeed) {
+          const seeded = await seedPlanesIfEmpty(
+            MOCK_PLANES_ENTRENAMIENTO,
+            DEFAULT_FICHAS_EDAD,
+            MOCK_PLANES_NUTRICION
+          );
+          alimentos = await seedAlimentosIfEmpty(FOOD_DATABASE);
+          planes = seeded.planes;
+          fichas = seeded.fichas;
+          nutri = seeded.nutri;
+        } else {
+          const [p, f, n, a] = await Promise.all([
+            fetchPlanesEntrenamiento(),
+            fetchFichasEdad(),
+            fetchPlanesNutricion(),
+            fetchAlimentosCalculadora(),
+          ]);
+          planes = p;
+          fichas = f;
+          nutri = n;
+          alimentos = a;
+        }
+
         if (cancelled) return;
-        // Firebase gana: no pisar planes ya editados (imágenes/videos). Solo completar faltantes.
         const byId = new Map<string, PlanEntrenamiento>();
         MOCK_PLANES_ENTRENAMIENTO.forEach((p) => byId.set(p.id, p));
-        seeded.planes.forEach((p) => byId.set(p.id, p));
+        planes.forEach((p) => byId.set(p.id, p));
         setPlanesEntrenamiento(Array.from(byId.values()));
-        setFichasEdad(seeded.fichas.length ? seeded.fichas : DEFAULT_FICHAS_EDAD);
-        setPlanesNutricion(seeded.nutri.length ? seeded.nutri : MOCK_PLANES_NUTRICION);
+        setFichasEdad(fichas.length ? fichas : DEFAULT_FICHAS_EDAD);
+        setPlanesNutricion(nutri.length ? nutri : MOCK_PLANES_NUTRICION);
         setAlimentosCalculadora(alimentos.length ? alimentos : FOOD_DATABASE);
         setCloudReady(true);
         setCloudError(null);
@@ -98,9 +190,8 @@ function MainAppContent() {
         if (!cancelled) {
           setCloudReady(false);
           setCloudError(
-            'No se pudo conectar a Firebase. Active Storage y publique reglas (Firestore + Storage).'
+            'No se pudo cargar catálogos. Publique reglas de Firestore e inicie sesión de nuevo.'
           );
-          // Aun sin nube, muestra los planes originales locales
           setPlanesEntrenamiento(MOCK_PLANES_ENTRENAMIENTO);
           setAlimentosCalculadora(FOOD_DATABASE);
         }
@@ -111,7 +202,7 @@ function MainAppContent() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isLoggedIn, currentUser?.cedula, currentUser?.role]);
 
   const applyRosterPage = (result: RosterPageResult, page: number, stack: (string | null)[]) => {
     setUsers(
@@ -401,6 +492,7 @@ function MainAppContent() {
 
   // Login de usuario con cédula: EL ROL SE ASIGNA EXCLUSIVAMENTE POR LA BASE DE DATOS
   const handleLoginSuccess = (user: UserAccount) => {
+    skipAuthRestoreRef.current = true;
     setCurrentUser(user);
     setCurrentRole(user.role);
     setInspectingUser(null);
@@ -413,6 +505,8 @@ function MainAppContent() {
   };
 
   const handleLogout = () => {
+    skipAuthRestoreRef.current = false;
+    signOut(auth).catch(console.error);
     setIsLoggedIn(false);
     setCurrentUser(null);
     setInspectingUser(null);
@@ -427,14 +521,30 @@ function MainAppContent() {
     );
   }
 
+  const bgLayer =
+    apariencia.fondoUrl ? (
+      <div className="pointer-events-none fixed inset-0 z-0" aria-hidden>
+        <div
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: `url(${apariencia.fondoUrl})` }}
+        />
+        <div
+          className={`absolute inset-0 ${isDark ? 'bg-slate-950' : 'bg-slate-50'}`}
+          style={{ opacity: 1 - apariencia.opacidad }}
+        />
+      </div>
+    ) : null;
+
   // Si no está autenticado, se muestra inmediatamente la pantalla de Login por Cédula
   if (!isLoggedIn || !currentUser) {
     return (
-      <div className={`min-h-screen flex flex-col font-sans transition-colors duration-300 ${
+      <div className={`relative min-h-screen flex flex-col font-sans transition-colors duration-300 ${
         isDark 
           ? 'bg-slate-950 text-slate-100 selection:bg-blue-600 selection:text-white' 
           : 'bg-slate-50 text-slate-900 selection:bg-blue-500 selection:text-white'
       }`}>
+        {bgLayer}
+        <div className="relative z-10 flex flex-col flex-1">
         {(cloudLoading || cloudError || cloudReady) && (
           <div className={`px-4 py-2 text-[11px] font-bold text-center border-b ${
             cloudError
@@ -458,18 +568,25 @@ function MainAppContent() {
         )}
         <LoginModal
           users={MOCK_USUARIOS}
+          onAuthSigningIn={() => {
+            skipAuthRestoreRef.current = true;
+          }}
           onLoginSuccess={handleLoginSuccess}
         />
+        </div>
+        <ScrollToTopButton />
       </div>
     );
   }
 
   return (
-    <div className={`min-h-screen flex flex-col font-sans transition-colors duration-300 ${
+    <div className={`relative min-h-screen flex flex-col font-sans transition-colors duration-300 ${
       isDark 
         ? 'bg-slate-950 text-slate-100 selection:bg-blue-600 selection:text-white' 
         : 'bg-slate-50 text-slate-900 selection:bg-blue-500 selection:text-white'
     }`}>
+      {bgLayer}
+      <div className="relative z-10 flex flex-col flex-1">
       
       {/* Barra de Navegación Superior con Rol Fijo Asignado en BD */}
       <HeaderNavbar
@@ -482,7 +599,16 @@ function MainAppContent() {
       />
 
       {/* Contenedor Principal */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+      <main
+        key={currentRole + (inspectingUser?.cedula || '')}
+        className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 animate-[panelFade_380ms_ease-out]"
+      >
+        <style>{`
+          @keyframes panelFade {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+        `}</style>
         
         {/* Vista según el Rol Asignado a la Cédula */}
         {currentRole === 'admin' && (
@@ -588,6 +714,7 @@ function MainAppContent() {
             planesNutricion={planesNutricion}
             planesEntrenamiento={planesEntrenamiento}
             alimentosCalculadora={alimentosCalculadora}
+            canManagePin
           />
         )}
 
@@ -620,23 +747,28 @@ function MainAppContent() {
       </main>
 
       {/* Footer Institucional */}
-      <footer className={`w-full py-6 text-center text-xs transition-colors duration-300 ${
-        isDark ? 'bg-slate-950 border-t border-slate-900 text-slate-500' : 'bg-white border-t border-slate-200 text-slate-500'
+      <footer className={`w-full py-6 transition-colors duration-300 ${
+        isDark ? 'bg-slate-950/90 border-t border-slate-900 text-slate-500' : 'bg-white/90 border-t border-slate-200 text-slate-500'
       }`}>
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p>
-            Plataforma Integral InBody 270S • Sistema de Diagnóstico Antropométrico y Rendimiento Físico
-          </p>
-          <div className={`flex items-center gap-4 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-            <span>LookinBody Compatible</span>
-            <span>•</span>
-            <span>Matriz 3x3 Somatotipos</span>
-            <span>•</span>
-            <span>Planes Regionales & Fichas de Edad</span>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col gap-5">
+          {currentRole !== 'admin' && <CreditosInstitucionales isDark={isDark} />}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+            <p>
+              Plataforma Integral InBody 270S • Sistema de Diagnóstico Antropométrico y Rendimiento Físico
+            </p>
+            <div className={`flex flex-wrap items-center gap-3 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+              <span>LookinBody Compatible</span>
+              <span>•</span>
+              <span>Matriz 3x3 Somatotipos</span>
+              <span>•</span>
+              <span>Planes Regionales & Fichas de Edad</span>
+            </div>
           </div>
+          <MedicalDisclaimer isDark={isDark} />
         </div>
       </footer>
-
+      </div>
+      <ScrollToTopButton />
     </div>
   );
 }
