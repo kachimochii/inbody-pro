@@ -40,6 +40,23 @@ export interface EdadCorporalPenalizaciones {
   /** Músculo global BAJO / ALTO vs baremo. */
   musculoBajoAnios: number;
   musculoAltoAnios: number;
+  /** Cada cuántos puntos de % grasa sobre el Alto se aplican `grasaAltaAnios`. */
+  grasaAltaCadaPct: number;
+  /** Años por cada bloque de % grasa sobre el Alto. */
+  grasaAltaAnios: number;
+  /** Años si la grasa queda bajo el Bajo. Negativo resta. */
+  grasaBajaAnios: number;
+  /** Desde este nivel de grasa visceral (1–30), si todavía no llega al nivel alto. */
+  visceralMedioDesde: number;
+  visceralMedioAnios: number;
+  visceralAltoDesde: number;
+  visceralAltoAnios: number;
+  /** Si el puntaje es menor que este valor, la edad corporal no baja de edad + saludBajaAnios. */
+  saludBajaDesde: number;
+  saludBajaAnios: number;
+  /** Si el puntaje es mayor o igual, la edad corporal no sube de edad + saludAltaAnios. */
+  saludAltaDesde: number;
+  saludAltaAnios: number;
 }
 
 export const DEFAULT_PENALIZACIONES: EdadCorporalPenalizaciones = {
@@ -51,6 +68,17 @@ export const DEFAULT_PENALIZACIONES: EdadCorporalPenalizaciones = {
   troncoAnios: 1.0,
   musculoBajoAnios: 3.0,
   musculoAltoAnios: -3.0,
+  grasaAltaCadaPct: 2,
+  grasaAltaAnios: 1.5,
+  grasaBajaAnios: -2,
+  visceralMedioDesde: 10,
+  visceralMedioAnios: 3,
+  visceralAltoDesde: 13,
+  visceralAltoAnios: 6,
+  saludBajaDesde: 70,
+  saludBajaAnios: 2,
+  saludAltaDesde: 85,
+  saludAltaAnios: -2,
 };
 
 /** Valores institucionales por defecto (edad corporal / semáforo). */
@@ -140,32 +168,12 @@ export function normalizeBaremosConfig(raw?: Partial<BaremosConfig> | null): Bar
   });
 
   const p: Partial<EdadCorporalPenalizaciones> = raw.penalizaciones || {};
-  base.penalizaciones = {
-    piernasUmbral: Number.isFinite(Number(p.piernasUmbral))
-      ? Number(p.piernasUmbral)
-      : DEFAULT_PENALIZACIONES.piernasUmbral,
-    piernasAnios: Number.isFinite(Number(p.piernasAnios))
-      ? Number(p.piernasAnios)
-      : DEFAULT_PENALIZACIONES.piernasAnios,
-    brazosUmbral: Number.isFinite(Number(p.brazosUmbral))
-      ? Number(p.brazosUmbral)
-      : DEFAULT_PENALIZACIONES.brazosUmbral,
-    brazosAnios: Number.isFinite(Number(p.brazosAnios))
-      ? Number(p.brazosAnios)
-      : DEFAULT_PENALIZACIONES.brazosAnios,
-    troncoUmbral: Number.isFinite(Number(p.troncoUmbral))
-      ? Number(p.troncoUmbral)
-      : DEFAULT_PENALIZACIONES.troncoUmbral,
-    troncoAnios: Number.isFinite(Number(p.troncoAnios))
-      ? Number(p.troncoAnios)
-      : DEFAULT_PENALIZACIONES.troncoAnios,
-    musculoBajoAnios: Number.isFinite(Number(p.musculoBajoAnios))
-      ? Number(p.musculoBajoAnios)
-      : DEFAULT_PENALIZACIONES.musculoBajoAnios,
-    musculoAltoAnios: Number.isFinite(Number(p.musculoAltoAnios))
-      ? Number(p.musculoAltoAnios)
-      : DEFAULT_PENALIZACIONES.musculoAltoAnios,
-  };
+  const nextPen: EdadCorporalPenalizaciones = { ...DEFAULT_PENALIZACIONES };
+  (Object.keys(DEFAULT_PENALIZACIONES) as Array<keyof EdadCorporalPenalizaciones>).forEach((key) => {
+    const v = Number(p[key]);
+    if (Number.isFinite(v)) nextPen[key] = v;
+  });
+  base.penalizaciones = nextPen;
 
   return base;
 }
@@ -211,6 +219,8 @@ export interface AnalisisCorporalResult {
     seglarBrazos: number;
     seglarTronco: number;
     musculo: number;
+    /** Años que agregó o quitó el puntaje al final. 0 si no movió el resultado. */
+    salud: number;
   };
   alertasSarcopenia: string[];
   baremoGrasa: { bajo: number; alto: number };
@@ -230,35 +240,49 @@ function sexoKey(sexo: Sexo | string): 'HOMBRE' | 'MUJER' {
   return String(sexo).toUpperCase().startsWith('F') ? 'MUJER' : 'HOMBRE';
 }
 
-function pickGrasaBaremo(sexo: Sexo, edad: number) {
-  const bands = getBaremosActivos()[sexoKey(sexo)].GRASA;
+function pickGrasaBaremo(sexo: Sexo, edad: number, cfg?: BaremosConfig) {
+  const bands = (cfg || getBaremosActivos())[sexoKey(sexo)].GRASA;
   const e = clampAge(edad);
   return bands.find((b) => e >= b.edadMin && e <= b.edadMax) || bands[bands.length - 1];
 }
 
-function pickMusculoBaremo(sexo: Sexo, edad: number) {
-  const bands = getBaremosActivos()[sexoKey(sexo)].MUSCULO_PCT;
+function pickMusculoBaremo(sexo: Sexo, edad: number, cfg?: BaremosConfig) {
+  const bands = (cfg || getBaremosActivos())[sexoKey(sexo)].MUSCULO_PCT;
   const e = clampAge(edad);
   return bands.find((b) => e >= b.edadMin && e <= b.edadMax) || bands[0];
 }
 
-export function getNivelSalud(puntaje: number): 1 | 2 | 3 {
+function nivelSaludDesdePuntaje(puntaje: number, pen: EdadCorporalPenalizaciones): 1 | 2 | 3 {
   const s = safeNum(puntaje, 0);
-  if (s >= 85) return 3;
-  if (s >= 70) return 2;
+  if (s >= pen.saludAltaDesde) return 3;
+  if (s >= pen.saludBajaDesde) return 2;
   return 1;
 }
 
-export function evaluarNivelGrasa(pctGrasa: number, sexo: Sexo, edad: number): NivelIndicador {
-  const baremo = pickGrasaBaremo(sexo, edad);
+export function getNivelSalud(puntaje: number): 1 | 2 | 3 {
+  return nivelSaludDesdePuntaje(puntaje, getPenalizacionesActivas());
+}
+
+export function evaluarNivelGrasa(
+  pctGrasa: number,
+  sexo: Sexo,
+  edad: number,
+  cfg?: BaremosConfig
+): NivelIndicador {
+  const baremo = pickGrasaBaremo(sexo, edad, cfg);
   const g = safeNum(pctGrasa, baremo.bajo + 1);
   if (g < baremo.bajo) return 'BAJO';
   if (g > baremo.alto) return 'ALTO';
   return 'ESTANDAR';
 }
 
-export function evaluarNivelMusculo(pctSMM: number, sexo: Sexo, edad: number): NivelIndicador {
-  const baremo = pickMusculoBaremo(sexo, edad);
+export function evaluarNivelMusculo(
+  pctSMM: number,
+  sexo: Sexo,
+  edad: number,
+  cfg?: BaremosConfig
+): NivelIndicador {
+  const baremo = pickMusculoBaremo(sexo, edad, cfg);
   const m = safeNum(pctSMM, baremo.insuficiente + 1);
   if (m < baremo.insuficiente) return 'BAJO';
   if (m > baremo.excelente) return 'ALTO';
@@ -273,18 +297,30 @@ export function resolverTipoCuerpo(
   return MATRIZ_3X3[key] || 'Tipo estándar';
 }
 
-function deltaGrasa(pctGrasa: number, nivel: NivelIndicador, limiteAlto: number): number {
+function deltaGrasa(
+  pctGrasa: number,
+  nivel: NivelIndicador,
+  limiteAlto: number,
+  pen: EdadCorporalPenalizaciones
+): number {
   if (nivel === 'ALTO') {
-    return 1.5 * ((safeNum(pctGrasa, limiteAlto) - limiteAlto) / 2);
+    const cada =
+      pen.grasaAltaCadaPct > 0 ? pen.grasaAltaCadaPct : DEFAULT_PENALIZACIONES.grasaAltaCadaPct;
+    return pen.grasaAltaAnios * ((safeNum(pctGrasa, limiteAlto) - limiteAlto) / cada);
   }
-  if (nivel === 'BAJO') return -2.0;
+  if (nivel === 'BAJO') return pen.grasaBajaAnios;
   return 0.0;
 }
 
-function deltaVisceral(nivel: number): number {
+function deltaVisceral(nivel: number, pen: EdadCorporalPenalizaciones): number {
   const v = Math.round(safeNum(nivel, 5));
-  if (v >= 13) return 6.0;
-  if (v >= 10) return 3.0;
+  const rules = [
+    { desde: pen.visceralAltoDesde, anios: pen.visceralAltoAnios },
+    { desde: pen.visceralMedioDesde, anios: pen.visceralMedioAnios },
+  ].sort((a, b) => b.desde - a.desde);
+  for (const rule of rules) {
+    if (v >= rule.desde) return rule.anios;
+  }
   return 0.0;
 }
 
@@ -303,25 +339,29 @@ function deltaSeglar(pct: number | undefined, umbral: number, anios: number): nu
   return p < umbral ? anios : 0.0;
 }
 
-export function calcularAnalisisCorporal(input: AnalisisCorporalInput): AnalisisCorporalResult {
+export function calcularAnalisisCorporal(
+  input: AnalisisCorporalInput,
+  cfgOverride?: BaremosConfig | null
+): AnalisisCorporalResult {
+  const cfg = cfgOverride ? normalizeBaremosConfig(cfgOverride) : getBaremosActivos();
   const edad = clampAge(input.edad);
   const sexo: Sexo = String(input.sexo).toUpperCase().startsWith('F') ? 'F' : 'M';
   const pctGrasa = safeNum(input.pctGrasa, sexo === 'F' ? 25 : 18);
   const pctSMM = safeNum(input.pctSMM, sexo === 'F' ? 35 : 42);
   const visceral = Math.max(1, Math.min(30, Math.round(safeNum(input.grasaVisceral, 5))));
   const puntaje = Math.max(0, Math.min(100, Math.round(safeNum(input.puntajeSalud, 70))));
-  const pen = getPenalizacionesActivas();
+  const pen = { ...DEFAULT_PENALIZACIONES, ...(cfg.penalizaciones || {}) };
 
-  const baremoG = pickGrasaBaremo(sexo, edad);
-  const baremoM = pickMusculoBaremo(sexo, edad);
+  const baremoG = pickGrasaBaremo(sexo, edad, cfg);
+  const baremoM = pickMusculoBaremo(sexo, edad, cfg);
 
-  const nivelGrasa = evaluarNivelGrasa(pctGrasa, sexo, edad);
-  const nivelMusculo = evaluarNivelMusculo(pctSMM, sexo, edad);
+  const nivelGrasa = evaluarNivelGrasa(pctGrasa, sexo, edad, cfg);
+  const nivelMusculo = evaluarNivelMusculo(pctSMM, sexo, edad, cfg);
   const tipoCuerpo = resolverTipoCuerpo(nivelMusculo, nivelGrasa);
-  const nivelSalud = getNivelSalud(puntaje);
+  const nivelSalud = nivelSaludDesdePuntaje(puntaje, pen);
 
-  const dG = deltaGrasa(pctGrasa, nivelGrasa, baremoG.alto);
-  const dV = deltaVisceral(visceral);
+  const dG = deltaGrasa(pctGrasa, nivelGrasa, baremoG.alto, pen);
+  const dV = deltaVisceral(visceral, pen);
   const dP = deltaSeglar(input.pctMusculoPiernas, pen.piernasUmbral, pen.piernasAnios);
   const dB = deltaSeglar(input.pctMusculoBrazos, pen.brazosUmbral, pen.brazosAnios);
   const dT = deltaSeglar(input.pctMusculoTronco, pen.troncoUmbral, pen.troncoAnios);
@@ -329,11 +369,20 @@ export function calcularAnalisisCorporal(input: AnalisisCorporalInput): Analisis
   void deltaMusculo;
 
   let edadCorp = edad + dG + dV + dP + dB + dT + dM;
+  let dS = 0;
 
-  if (nivelSalud === 1) {
-    edadCorp = Math.max(edad + 2, edadCorp);
-  } else if (nivelSalud === 3) {
-    edadCorp = Math.min(edad - 2, edadCorp);
+  if (puntaje < pen.saludBajaDesde) {
+    const piso = edad + pen.saludBajaAnios;
+    if (edadCorp < piso) {
+      dS = piso - edadCorp;
+      edadCorp = piso;
+    }
+  } else if (puntaje >= pen.saludAltaDesde) {
+    const techo = edad + pen.saludAltaAnios;
+    if (edadCorp > techo) {
+      dS = techo - edadCorp;
+      edadCorp = techo;
+    }
   }
 
   edadCorp = Math.max(18, Math.round(edadCorp));
@@ -378,6 +427,7 @@ export function calcularAnalisisCorporal(input: AnalisisCorporalInput): Analisis
       seglarBrazos: dB,
       seglarTronco: dT,
       musculo: dM,
+      salud: dS,
     },
     alertasSarcopenia,
     baremoGrasa: { bajo: baremoG.bajo, alto: baremoG.alto },
