@@ -3,7 +3,9 @@ import { calculateAge } from './inbodyCalculations';
 import {
   calcularAnalisisCorporal,
   pctSmmFromKg,
+  pctMusculoBrazosFromSegmental,
   pctMusculoPiernasFromSegmental,
+  pctMusculoTroncoFromSegmental,
 } from './composicionCorporal';
 
 export interface ParsedImportRow {
@@ -77,6 +79,11 @@ function splitCsvLine(line: string, delimiter: string): string[] {
   }
   fields.push(current.trim());
   return fields;
+}
+
+/** Misma clave que Firestore: solo dígitos, 10 posiciones. */
+function cedulaKey(value: string): string {
+  return String(value || '').replace(/\D/g, '').padStart(10, '0').slice(-10);
 }
 
 function parseNum(val: string | undefined, defaultVal: number): number {
@@ -264,6 +271,7 @@ export function parseInbodyCsvContent(
 
     const rawCedula = (rawCols[colCedula] || '').replace(/[^0-9]/g, '').trim();
     if (!rawCedula) continue;
+    const cedula = cedulaKey(rawCedula);
 
     const rawAlturaVal = colAltura !== -1 ? rawCols[colAltura] : '';
     const rawPesoVal = colPeso !== -1 ? rawCols[colPeso] : '';
@@ -275,7 +283,7 @@ export function parseInbodyCsvContent(
     const peso = parseNum(rawPesoVal, 0);
     if (alturaCm <= 0 || peso <= 0) continue;
 
-    const existing = existingUsers.find((u) => u.cedula === rawCedula);
+    const existing = existingUsers.find((u) => cedulaKey(u.cedula) === cedula);
     const cell = (col: number) => (col !== -1 ? rawCols[col] : undefined);
 
     const musculoKg =
@@ -299,49 +307,55 @@ export function parseInbodyCsvContent(
       score = Math.min(99, Math.max(50, Math.round(80 + (musculoKg - 32) * 1.5 - (pctEst - 18) * 1.2)));
     }
 
-    const nombresFull =
-      colNombres !== -1 && rawCols[colNombres]
+    // Columnas A–K (cédula aparte): si la persona ya existe, se conservan
+    // los datos del sistema. El archivo solo aporta la medición (desde altura).
+    const nombresFull = existing
+      ? existing.nombres.trim()
+      : colNombres !== -1 && rawCols[colNombres]
         ? rawCols[colNombres]
-        : existing
-          ? existing.nombres.trim()
-          : 'Personal Evaluado';
-    const grado =
-      colGrado !== -1 && rawCols[colGrado]
+        : 'Personal Evaluado';
+    const grado = existing
+      ? existing.grado || 'Cabo Segundo'
+      : colGrado !== -1 && rawCols[colGrado]
         ? rawCols[colGrado]
-        : existing?.grado || 'Cabo Segundo';
-    const tituloC =
-      colTituloC !== -1 && rawCols[colTituloC]
+        : 'Cabo Segundo';
+    const tituloC = existing
+      ? existing.tituloC || ''
+      : colTituloC !== -1 && rawCols[colTituloC]
         ? rawCols[colTituloC]
-        : existing?.tituloC || '';
-    const tituloD =
-      colTituloD !== -1 && rawCols[colTituloD]
+        : '';
+    const tituloD = existing
+      ? existing.tituloD || ''
+      : colTituloD !== -1 && rawCols[colTituloD]
         ? rawCols[colTituloD]
-        : existing?.tituloD || '';
-    const sexoRaw =
-      colSexo !== -1 && rawCols[colSexo]
+        : '';
+    const sexoRaw = existing
+      ? existing.sexo || 'M'
+      : colSexo !== -1 && rawCols[colSexo]
         ? rawCols[colSexo].toUpperCase().trim()
-        : existing?.sexo || 'M';
-    const sexo: 'M' | 'F' = sexoRaw.startsWith('F') ? 'F' : 'M';
-    const unidad =
-      colUnidad !== -1 && rawCols[colUnidad]
+        : 'M';
+    const sexo: 'M' | 'F' = String(sexoRaw).toUpperCase().startsWith('F') ? 'F' : 'M';
+    const unidad = existing
+      ? existing.unidadActual || 'Fuerzas Armadas del Ecuador'
+      : colUnidad !== -1 && rawCols[colUnidad]
         ? rawCols[colUnidad]
-        : existing?.unidadActual || 'Fuerzas Armadas del Ecuador';
-    const fechaNacIso = toIsoDate(
-      cell(colFechaNac),
-      existing?.fechaNacimiento || '1990-01-01'
-    );
-    const fechaIngIso = toIsoDate(
-      cell(colFechaIng),
-      existing?.fechaIngreso || '2010-01-01'
-    );
-    const tipoUsuario =
-      colTipoUsuario !== -1 && rawCols[colTipoUsuario]
+        : 'Fuerzas Armadas del Ecuador';
+    const fechaNacIso = existing
+      ? existing.fechaNacimiento || '1990-01-01'
+      : toIsoDate(cell(colFechaNac), '1990-01-01');
+    const fechaIngIso = existing
+      ? existing.fechaIngreso || '2010-01-01'
+      : toIsoDate(cell(colFechaIng), '2010-01-01');
+    const tipoUsuario = existing
+      ? existing.tipoUsuario || 'Militar en Servicio Activo'
+      : colTipoUsuario !== -1 && rawCols[colTipoUsuario]
         ? rawCols[colTipoUsuario]
-        : existing?.tipoUsuario || 'Militar en Servicio Activo';
-    const region =
-      colRegion !== -1 && rawCols[colRegion]
+        : 'Militar en Servicio Activo';
+    const region = existing
+      ? existing.region || 'Sierra'
+      : colRegion !== -1 && rawCols[colRegion]
         ? rawCols[colRegion]
-        : existing?.region || 'Sierra';
+        : 'Sierra';
 
     const musculoBD =
       colMusculoBD !== -1
@@ -486,6 +500,8 @@ export function parseInbodyCsvContent(
         ? parseNum(cell(colPctSmm), pctSmmFromKg(musculoKg, peso))
         : pctSmmFromKg(musculoKg, peso);
     const pctMusculoPiernas = pctMusculoPiernasFromSegmental(musculoPDPct, musculoPIPct);
+    const pctMusculoBrazos = pctMusculoBrazosFromSegmental(musculoBDPct, musculoBIPct);
+    const pctMusculoTronco = pctMusculoTroncoFromSegmental(musculoTRPct);
 
     const edadCron = calculateAge(fechaNacIso);
     // Siempre calcular: no importar edad corporal ni InBody Type (col 96)
@@ -496,6 +512,8 @@ export function parseInbodyCsvContent(
       pctSMM,
       grasaVisceral,
       pctMusculoPiernas,
+      pctMusculoBrazos,
+      pctMusculoTronco,
       puntajeSalud: score,
     });
 
@@ -503,7 +521,7 @@ export function parseInbodyCsvContent(
     const fechaMedicion = toIsoDate(cell(colFechaMedicion), hoyIso);
 
     // ID único por carga (Date.now + idx) para historial
-    const medId = `med-${rawCedula}-${fechaMedicion}-${uploadStamp}-${idx}`;
+    const medId = `med-${cedula}-${fechaMedicion}-${uploadStamp}-${idx}`;
 
     const fullRecord: InBodyRecord = {
       id: medId,
@@ -565,8 +583,8 @@ export function parseInbodyCsvContent(
     };
 
     const row: ParsedImportRow = {
-      id: `row-${uploadStamp}-${idx}-${rawCedula}`,
-      cedula: rawCedula,
+      id: `row-${uploadStamp}-${idx}-${cedula}`,
+      cedula: existing?.cedula || cedula,
       nombreDetectado: nombresFull,
       gradoDetectado: grado,
       tituloCDetectado: tituloC || undefined,

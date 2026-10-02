@@ -321,7 +321,7 @@ export const OperadorDashboard: React.FC<OperadorDashboardProps> = ({
               Ingesta y Procesamiento de Mediciones
             </h2>
             <p className="text-xs text-slate-400 mt-0.5 max-w-2xl">
-              Carga el CSV exportado de LookinBody (mismo formato que INBODY 1.csv) o descarga la plantilla oficial. Misma cédula en otra fecha = nueva medición en el historial (2.ª, 3.ª…). Edad corporal y somatotipo los calcula la app automáticamente.
+              La fila se une por la cédula. Si esa persona ya está registrada, nombre, grado, sexo, fechas, unidad y región (hasta la columna K) no se modifican: se conservan los que tú guardaste. Del archivo solo entra la medición (altura, peso, grasa, músculo, visceral y lo demás que usa la app). Otra fecha con la misma cédula suma una toma al historial.
             </p>
           </div>
 
