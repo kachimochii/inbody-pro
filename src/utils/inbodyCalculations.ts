@@ -184,50 +184,85 @@ function getPositionInTicks(val: number, ticks: number[]): number {
   return 50;
 }
 
-export function calculateAge(fechaNacimiento: string): number {
-  if (!fechaNacimiento) return 30;
-  // Soporta YYYY-MM-DD y DD/MM/YYYY
-  let nac: Date;
-  const dmy = String(fechaNacimiento).trim().match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-  if (dmy) {
-    nac = new Date(Number(dmy[3]), Number(dmy[2]) - 1, Number(dmy[1]));
-  } else {
-    nac = new Date(fechaNacimiento);
-  }
-  const hoy = new Date();
-  let edad = hoy.getFullYear() - nac.getFullYear();
-  const m = hoy.getMonth() - nac.getMonth();
-  if (m < 0 || (m === 0 && hoy.getDate() < nac.getDate())) {
-    edad--;
-  }
-  return isNaN(edad) ? 30 : Math.max(16, edad);
+/** Calendario de Ecuador (America/Guayaquil, UTC−5, sin horario de verano). */
+const ZONA_ECUADOR = 'America/Guayaquil';
+
+export interface FechaCalendario {
+  y: number;
+  m: number;
+  d: number;
 }
 
-export function calculateTimeInService(fechaIngreso: string): string {
-  if (!fechaIngreso) return 'Sin datos';
-  const hoy = new Date();
-  let ing: Date;
-  const dmy = String(fechaIngreso).trim().match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-  if (dmy) {
-    ing = new Date(Number(dmy[3]), Number(dmy[2]) - 1, Number(dmy[1]));
-  } else {
-    ing = new Date(fechaIngreso);
-  }
-  if (isNaN(ing.getTime())) return 'Sin datos';
+/** Día civil en Ecuador, sin corrimiento por la medianoche UTC. */
+export function fechaCalendarioEcuador(instante: Date = new Date()): FechaCalendario {
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone: ZONA_ECUADOR,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(instante);
+  const leer = (tipo: string) => Number(partes.find((p) => p.type === tipo)?.value);
+  return { y: leer('year'), m: leer('month'), d: leer('day') };
+}
 
-  let anios = hoy.getFullYear() - ing.getFullYear();
-  let meses = hoy.getMonth() - ing.getMonth();
-  let dias = hoy.getDate() - ing.getDate();
+/** YYYY-MM-DD del día en Ecuador. */
+export function fechaHoyEcuador(instante: Date = new Date()): string {
+  const { y, m, d } = fechaCalendarioEcuador(instante);
+  return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+/** Lee DD/MM/YYYY o YYYY-MM-DD como fecha de calendario, no como instante UTC. */
+export function parseFechaCalendario(raw: string): FechaCalendario | null {
+  const s = String(raw || '').trim();
+  if (!s) return null;
+  const dmy = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  if (dmy) return { y: Number(dmy[3]), m: Number(dmy[2]), d: Number(dmy[1]) };
+  const ymd = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+  if (ymd) return { y: Number(ymd[1]), m: Number(ymd[2]), d: Number(ymd[3]) };
+  return null;
+}
+
+function diasDelMes(y: number, m: number): number {
+  return new Date(Date.UTC(y, m, 0)).getUTCDate();
+}
+
+export function calculateAge(fechaNacimiento: string, instante: Date = new Date()): number {
+  const nac = parseFechaCalendario(fechaNacimiento);
+  if (!nac || nac.m < 1 || nac.m > 12 || nac.d < 1 || nac.d > 31) return 30;
+  const hoy = fechaCalendarioEcuador(instante);
+  let edad = hoy.y - nac.y;
+  if (hoy.m < nac.m || (hoy.m === nac.m && hoy.d < nac.d)) edad--;
+  return Number.isFinite(edad) ? Math.max(16, edad) : 30;
+}
+
+/** Cumpleaños según el día civil de Ecuador. */
+export function esCumpleanos(fechaNacimiento: string, instante: Date = new Date()): boolean {
+  const nac = parseFechaCalendario(fechaNacimiento);
+  if (!nac) return false;
+  const hoy = fechaCalendarioEcuador(instante);
+  return hoy.m === nac.m && hoy.d === nac.d;
+}
+
+export function calculateTimeInService(fechaIngreso: string, instante: Date = new Date()): string {
+  const ing = parseFechaCalendario(fechaIngreso);
+  if (!ing) return 'Sin datos';
+  const hoy = fechaCalendarioEcuador(instante);
+
+  let anios = hoy.y - ing.y;
+  let meses = hoy.m - ing.m;
+  let dias = hoy.d - ing.d;
 
   if (dias < 0) {
     meses--;
-    const mesAnterior = new Date(hoy.getFullYear(), hoy.getMonth(), 0);
-    dias += mesAnterior.getDate();
+    const prevM = hoy.m === 1 ? 12 : hoy.m - 1;
+    const prevY = hoy.m === 1 ? hoy.y - 1 : hoy.y;
+    dias += diasDelMes(prevY, prevM);
   }
   if (meses < 0) {
     anios--;
     meses += 12;
   }
+  if (anios < 0) return 'Sin datos';
   return `${anios} años, ${meses} meses`;
 }
 
@@ -349,7 +384,7 @@ export function createRecordFromRaw(
 
   return {
     id: `med-${cedula || 'x'}-${Date.now()}`,
-    fecha: new Date().toISOString().split('T')[0],
+    fecha: fechaHoyEcuador(),
     alturaCm: altura,
     peso,
     aguaKg,

@@ -2,12 +2,21 @@ import React, { useEffect, useMemo, useState } from 'react';
 
 interface LevelUpConfettiProps {
   show: boolean;
-  nivel: number;
+  nivel?: number;
+  /** Cumpleaños usa el mismo confeti, con otro mensaje. */
+  variante?: 'nivel' | 'cumple';
+  edad?: number;
   onDone?: () => void;
 }
 
 /** Confeti militar (verdes oscuros) + mensaje al subir de nivel InBody. */
-export const LevelUpConfetti: React.FC<LevelUpConfettiProps> = ({ show, nivel, onDone }) => {
+export const LevelUpConfetti: React.FC<LevelUpConfettiProps> = ({
+  show,
+  nivel = 1,
+  variante = 'nivel',
+  edad,
+  onDone,
+}) => {
   const [visible, setVisible] = useState(false);
   const pieces = useMemo(
     () =>
@@ -17,10 +26,12 @@ export const LevelUpConfetti: React.FC<LevelUpConfettiProps> = ({ show, nivel, o
         delay: Math.random() * 0.6,
         duration: 1.8 + Math.random() * 1.4,
         size: 4 + Math.random() * 6,
-        color: ['#14532d', '#166534', '#3f6212', '#365314', '#052e16', '#a3e635'][i % 6],
+        color: (variante === 'cumple'
+          ? ['#14532d', '#166534', '#fbbf24', '#f59e0b', '#a3e635', '#fde68a']
+          : ['#14532d', '#166534', '#3f6212', '#365314', '#052e16', '#a3e635'])[i % 6],
         rotate: Math.random() * 360,
       })),
-    [show]
+    [show, variante]
   );
 
   useEffect(() => {
@@ -67,17 +78,23 @@ export const LevelUpConfetti: React.FC<LevelUpConfettiProps> = ({ show, nivel, o
       ))}
       <div className="absolute inset-0 flex items-center justify-center px-4">
         <div
-          className="rounded-3xl border border-emerald-700/50 bg-emerald-950/95 px-6 py-5 text-center shadow-2xl shadow-emerald-950/50"
+          className={`rounded-3xl border px-6 py-5 text-center shadow-2xl ${
+            variante === 'cumple'
+              ? 'border-amber-400/50 bg-slate-950/95 shadow-amber-950/40'
+              : 'border-emerald-700/50 bg-emerald-950/95 shadow-emerald-950/50'
+          }`}
           style={{ animation: 'levelUpPop 3.8s ease-out forwards' }}
         >
-          <p className="text-[10px] font-black uppercase tracking-[0.25em] text-lime-400/90">
-            Ascenso operativo
+          <p className={`text-[10px] font-black uppercase tracking-[0.25em] ${
+            variante === 'cumple' ? 'text-amber-300/90' : 'text-lime-400/90'
+          }`}>
+            {variante === 'cumple' ? 'Día de aniversario' : 'Ascenso operativo'}
           </p>
-          <p className="mt-2 text-2xl sm:text-3xl font-black text-emerald-100 tracking-wide">
-            ¡Subiste de nivel!
+          <p className="mt-2 text-2xl sm:text-3xl font-black text-emerald-50 tracking-wide">
+            {variante === 'cumple' ? `Hoy cumples ${edad ?? ''} años` : '¡Subiste de nivel!'}
           </p>
-          <p className="mt-1 text-sm font-bold text-lime-300/90">
-            Ahora estás en Nivel {nivel}
+          <p className={`mt-1 text-sm font-bold ${variante === 'cumple' ? 'text-amber-200/90' : 'text-lime-300/90'}`}>
+            {variante === 'cumple' ? 'Que el año sume fuerza.' : `Ahora estás en Nivel ${nivel}`}
           </p>
         </div>
       </div>

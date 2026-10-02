@@ -1,5 +1,5 @@
 import { UserAccount, InBodyRecord } from '../types/inbody';
-import { calculateAge } from './inbodyCalculations';
+import { calculateAge, fechaHoyEcuador } from './inbodyCalculations';
 import {
   calcularAnalisisCorporal,
   pctSmmFromKg,
@@ -517,7 +517,7 @@ export function parseInbodyCsvContent(
       puntajeSalud: score,
     });
 
-    const hoyIso = new Date().toISOString().split('T')[0];
+    const hoyIso = fechaHoyEcuador();
     const fechaMedicion = toIsoDate(cell(colFechaMedicion), hoyIso);
 
     // ID único por carga (Date.now + idx) para historial

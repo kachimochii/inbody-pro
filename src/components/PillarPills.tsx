@@ -20,8 +20,9 @@ export const PillarPills: React.FC<PillarPillsProps> = ({ isDark = true, centere
   useEffect(() => {
     setVisibleCount(0);
     const timers: number[] = [];
+    // Espera a que la ficha esté en pantalla y luego entra cada pilar, para que se note.
     PILARES.forEach((_, i) => {
-      timers.push(window.setTimeout(() => setVisibleCount(i + 1), 180 + i * 220));
+      timers.push(window.setTimeout(() => setVisibleCount(i + 1), 2400 + i * 700));
     });
     return () => timers.forEach((t) => window.clearTimeout(t));
   }, []);
@@ -33,7 +34,7 @@ export const PillarPills: React.FC<PillarPillsProps> = ({ isDark = true, centere
         return (
           <span
             key={p.key}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[11px] font-black uppercase tracking-wider transition-all duration-500 ${
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[11px] font-black uppercase tracking-wider transition-all duration-700 ease-out ${
               p.color
             } ${show ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-2 scale-95'} ${
               isDark ? '' : 'brightness-95'

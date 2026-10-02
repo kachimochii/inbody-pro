@@ -9,8 +9,9 @@ import {
   FRASES_MANDO
 } from '../../data/mockData';
 import {
-  calculateAge, 
-  calculateTimeInService, 
+  calculateAge,
+  calculateTimeInService,
+  esCumpleanos, 
   extractYoutubeVideoId,
   resolveTipoCuerpo,
 } from '../../utils/inbodyCalculations';
@@ -75,7 +76,8 @@ import {
   Volume2,
   VolumeX,
   Music,
-  Star
+  Star,
+  Cake,
 } from 'lucide-react';
 
 interface EvaluadoDashboardProps {
@@ -120,11 +122,24 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
   // Historial: índice 0 = medición más reciente
   const [medIndex, setMedIndex] = useState(0);
   const [showLevelUp, setShowLevelUp] = useState(false);
+  const [showCumple, setShowCumple] = useState(false);
+  const cumpleShownRef = useRef('');
   const levelUpShownRef = useRef<string>('');
 
   useEffect(() => {
     setMedIndex(0);
   }, [user.cedula, user.mediciones.length]);
+
+  useEffect(() => {
+    if (!esCumpleanos(user.fechaNacimiento)) {
+      setShowCumple(false);
+      return;
+    }
+    const key = `${user.cedula}:${user.fechaNacimiento}`;
+    if (cumpleShownRef.current === key) return;
+    cumpleShownRef.current = key;
+    setShowCumple(true);
+  }, [user.cedula, user.fechaNacimiento]);
 
   useEffect(() => {
     getCreditosConfig()
@@ -261,6 +276,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
   }
 
   const edad = calculateAge(user.fechaNacimiento);
+  const cumpleHoy = esCumpleanos(user.fechaNacimiento);
   const tiempoServicio = calculateTimeInService(user.fechaIngreso);
   const score = medActual.inbodyScore;
   const deltasHistorial = medAnterior ? buildDeltasHistorial(medActual, medAnterior) : [];
@@ -423,6 +439,12 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
         nivel={nivelNumero}
         onDone={() => setShowLevelUp(false)}
       />
+      <LevelUpConfetti
+        show={showCumple}
+        variante="cumple"
+        edad={edad}
+        onDone={() => setShowCumple(false)}
+      />
       
       {/* Botón de Regreso si se está inspeccionando desde otro rol */}
       {onBack && (
@@ -472,9 +494,24 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
               </span>
             </div>
 
-            <h1 className={`text-2xl sm:text-3xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
-              {nombreCompleto}
+            <h1 className={`text-2xl sm:text-3xl font-black flex flex-wrap items-center gap-3 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              <span>{nombreCompleto}</span>
+              {cumpleHoy && (
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider border shadow-sm ${
+                  isDark
+                    ? 'border-amber-400/50 bg-amber-500/15 text-amber-200 shadow-amber-500/20'
+                    : 'border-amber-400 bg-amber-100 text-amber-800 shadow-amber-200/60'
+                }`}>
+                  <Cake className="w-3.5 h-3.5" />
+                  Cumpleaños
+                </span>
+              )}
             </h1>
+            {cumpleHoy && (
+              <p className={`text-sm font-black ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>
+                Hoy cumples {edad} años
+              </p>
+            )}
 
             {(nombreUnidadLargo || provinciaUnidad || regionUnidad) && (
               <div className={`flex flex-wrap items-center gap-x-4 gap-y-1 text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>

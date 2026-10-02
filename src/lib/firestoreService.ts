@@ -21,6 +21,7 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage, STORAGE_BUCKET_CANDIDATES, getStorageForBucket } from './firebase';
+import { fechaHoyEcuador } from '../utils/inbodyCalculations';
 import {
   UserAccount,
   UserRole,
@@ -125,7 +126,7 @@ function normalizeMedicion(raw: unknown, cedula: string, index: number): InBodyR
 
   return {
     id: strField(r, ['id'], `med-${cedula}-${index}`),
-    fecha: toIsoDate(strField(r, ['fecha', 'fechaMedicion', 'Fecha_Medicion'], new Date().toISOString().slice(0, 10))),
+    fecha: toIsoDate(strField(r, ['fecha', 'fechaMedicion', 'Fecha_Medicion'], fechaHoyEcuador())),
     alturaCm,
     peso,
     aguaKg: numField(r, ['aguaKg', 'agua']),
