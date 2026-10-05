@@ -667,7 +667,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
                       );
                     })}
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <div className="hidden md:grid grid-cols-1 md:grid-cols-2 gap-2">
                     {frasesHistorial.map((frase) => {
                       const ui = SEMAFORO_UI[frase.nivel];
                       return (
@@ -708,9 +708,10 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
               </span>
             </div>
             <h2 className={`text-xl sm:text-2xl font-black mt-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-              Anatomía y Siluetas InBody • Comparación Dual
+              <span className="md:hidden">Tu silueta y la meta</span>
+              <span className="hidden md:inline">Anatomía y Siluetas InBody • Comparación Dual</span>
             </h2>
-            <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            <p className={`hidden md:block text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
               Tu somatotipo actual al lado de la meta ideal, con semaforización visual de impacto.
             </p>
           </div>
@@ -747,20 +748,20 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
 
         {/* Primero: 2 siluetas | Luego: texto de métricas */}
         <div className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-2 sm:gap-4">
             <div
               onClick={() => setModalSomatotipo(defActual)}
-              className={`rounded-3xl border-4 p-4 flex flex-col items-center cursor-pointer transition-all hover:scale-[1.01] shadow-xl ring-2 ${actualRing} ${
+              className={`rounded-3xl border-4 p-2 sm:p-4 flex flex-col items-center cursor-pointer transition-all hover:scale-[1.01] shadow-xl ring-2 ${actualRing} ${
                 isDark ? 'bg-slate-950/90' : 'bg-white'
               }`}
               title="Tu somatotipo actual — clic para ficha médica"
             >
-              <div className="w-full max-w-[320px] h-80 sm:h-[22rem] flex items-center justify-center">
+              <div className="w-full h-64 sm:h-80 overflow-hidden flex items-center justify-center">
                 <img
                   src={siluetaActualUrl}
                   alt={somatotipoActual}
                   referrerPolicy="no-referrer"
-                  className="w-full h-full object-contain drop-shadow-2xl"
+                  className="w-full h-full object-contain origin-center scale-[1.55] sm:scale-[1.42] drop-shadow-2xl"
                 />
               </div>
               <div className="w-full flex items-center justify-between gap-2 mt-3">
@@ -783,17 +784,17 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
 
             <div
               onClick={() => setModalSomatotipo(defIdeal)}
-              className={`rounded-3xl border-4 p-4 flex flex-col items-center cursor-pointer transition-all hover:scale-[1.01] shadow-xl ring-2 ${idealRing} ${
+              className={`rounded-3xl border-4 p-2 sm:p-4 flex flex-col items-center cursor-pointer transition-all hover:scale-[1.01] shadow-xl ring-2 ${idealRing} ${
                 isDark ? 'bg-gradient-to-br from-slate-950 via-slate-900 to-cyan-950/40' : 'bg-gradient-to-br from-cyan-50 via-white to-blue-50'
               }`}
               title="Somatotipo meta ideal — clic para ficha médica"
             >
-              <div className="w-full max-w-[320px] h-80 sm:h-[22rem] flex items-center justify-center">
+              <div className="w-full h-64 sm:h-80 overflow-hidden flex items-center justify-center">
                 <img
                   src={siluetaIdealUrl}
                   alt={somatotipoIdealNombre}
                   referrerPolicy="no-referrer"
-                  className="w-full h-full object-contain drop-shadow-[0_8px_24px_rgba(6,182,212,0.35)]"
+                  className="w-full h-full object-contain origin-center scale-[1.55] sm:scale-[1.42] drop-shadow-[0_8px_24px_rgba(6,182,212,0.35)]"
                 />
               </div>
               <div className="w-full flex items-center justify-between gap-2 mt-3">
@@ -836,7 +837,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
               <div className={`text-lg font-black font-mono mt-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>
                 {medActual.grasaKg.toFixed(1)} kg ({medActual.pctGrasa.toFixed(1)}%)
               </div>
-              <p className="text-[11px] text-slate-400 mt-1 leading-snug">
+              <p className="hidden md:block text-[11px] text-slate-400 mt-1 leading-snug">
                 {medActual.pctGrasa < 18
                   ? 'Nivel magro y atlético, excelente control de tejido graso.'
                   : medActual.pctGrasa <= 24
@@ -860,7 +861,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
               <div className={`text-lg font-black font-mono mt-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>
                 {medActual.musculoKg.toFixed(1)} kg
               </div>
-              <p className="text-[11px] text-slate-400 mt-1 leading-snug">
+              <p className="hidden md:block text-[11px] text-slate-400 mt-1 leading-snug">
                 {medActual.musculoKg >= medActual.rangoSmmMin
                   ? 'Buena base de fuerza esquelética y tono muscular para tareas físicas.'
                   : 'Masa muscular en rango a potenciar con entrenamiento progresivo.'}
@@ -877,7 +878,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
                   {porcentajeSimetria}% Equilibrio
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 mt-1 leading-snug">
+              <p className="hidden md:block text-[11px] text-slate-400 mt-1 leading-snug">
                 {esSimetrico
                   ? 'Excelente equilibrio entre tu lado izquierdo y derecho (brazos y piernas nivelados).'
                   : 'Ligera variación entre extremidades; se recomienda trabajo unilateral compensatorio.'}
@@ -890,10 +891,12 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
         <div className={`pt-2 border-t ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
           <div className="flex items-center justify-between mb-2">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-              Distribución en los 5 Segmentos Corporales:
+              <span className="md:hidden">Zonas del cuerpo</span>
+              <span className="hidden md:inline">Distribución en los 5 Segmentos Corporales:</span>
             </span>
             <span className="text-[10px] text-blue-500 dark:text-blue-400 font-bold flex items-center gap-1">
-              <span>Haz clic en una zona para ver su diagnóstico</span>
+              <span className="md:hidden">Toca una zona</span>
+              <span className="hidden md:inline">Haz clic en una zona para ver su diagnóstico</span>
               <ChevronRight className="w-3 h-3" />
             </span>
           </div>
@@ -963,6 +966,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
           {(() => {
             const infoSeg = {
               BD: {
+                corto: 'Brazo derecho',
                 nombre: 'Brazo Derecho (Miembro Superior)',
                 musculo: masaBrazosD,
                 musculoPct: seg.musculoBDPct ?? 105,
@@ -972,6 +976,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
                 simetriaVsOpuesto: `${Math.abs(masaBrazosD - masaBrazosI).toFixed(2)} kg de diferencia vs Brazo Izquierdo.`,
               },
               BI: {
+                corto: 'Brazo izquierdo',
                 nombre: 'Brazo Izquierdo (Miembro Superior)',
                 musculo: masaBrazosI,
                 musculoPct: seg.musculoBIPct ?? 104,
@@ -981,6 +986,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
                 simetriaVsOpuesto: `${Math.abs(masaBrazosD - masaBrazosI).toFixed(2)} kg de diferencia vs Brazo Derecho.`,
               },
               TR: {
+                corto: 'Tronco',
                 nombre: 'Tronco y Zona Media (Core & Columna)',
                 musculo: masaTronco,
                 musculoPct: seg.musculoTRPct ?? 105,
@@ -990,6 +996,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
                 simetriaVsOpuesto: 'Eje axial central. Estabilidad y soporte de carga a las cuatro extremidades.',
               },
               PD: {
+                corto: 'Pierna derecha',
                 nombre: 'Pierna Derecha (Tren Inferior)',
                 musculo: masaPiernasD,
                 musculoPct: seg.musculoPDPct ?? 104,
@@ -999,6 +1006,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
                 simetriaVsOpuesto: `${Math.abs(masaPiernasD - masaPiernasI).toFixed(2)} kg de diferencia vs Pierna Izquierda.`,
               },
               PI: {
+                corto: 'Pierna izquierda',
                 nombre: 'Pierna Izquierda (Tren Inferior)',
                 musculo: masaPiernasI,
                 musculoPct: seg.musculoPIPct ?? 103,
@@ -1017,26 +1025,39 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
                   <div className="flex items-center gap-2">
                     <Activity className="w-4 h-4 text-blue-500" />
                     <span className="text-xs font-black text-blue-600 dark:text-blue-400 uppercase tracking-wider">
-                      Diagnóstico: {infoSeg.nombre}
+                      <span className="md:hidden">{infoSeg.corto}</span>
+                      <span className="hidden md:inline">Diagnóstico: {infoSeg.nombre}</span>
                     </span>
                   </div>
                   <span className={`text-xs font-mono font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                    {infoSeg.musculo.toFixed(2)} kg músculo ({infoSeg.musculoPct}% estándar) • {infoSeg.grasa.toFixed(2)} kg grasa
+                    <span className="md:hidden">{infoSeg.musculo.toFixed(1)} kg</span>
+                    <span className="hidden md:inline">{infoSeg.musculo.toFixed(2)} kg músculo ({infoSeg.musculoPct}% estándar) • {infoSeg.grasa.toFixed(2)} kg grasa</span>
                   </span>
                 </div>
-                <p className={`text-xs mt-2 leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                  {infoSeg.evaluacion}
-                </p>
-                <div className={`mt-2.5 pt-2 border-t flex flex-col sm:flex-row sm:items-center justify-between text-[11px] gap-2 ${
-                  isDark ? 'border-slate-800 text-slate-400' : 'border-blue-100 text-slate-600'
-                }`}>
-                  <div>
-                    <strong className="text-blue-500 dark:text-blue-400">Entrenamiento prescrito:</strong> {infoSeg.ejercicio}
-                  </div>
-                  <div className="text-cyan-600 dark:text-cyan-400 font-semibold shrink-0">
-                    {infoSeg.simetriaVsOpuesto}
+                <div className="hidden md:block">
+                  <p className={`text-xs mt-2 leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                    {infoSeg.evaluacion}
+                  </p>
+                  <div className={`mt-2.5 pt-2 border-t flex flex-col sm:flex-row sm:items-center justify-between text-[11px] gap-2 ${
+                    isDark ? 'border-slate-800 text-slate-400' : 'border-blue-100 text-slate-600'
+                  }`}>
+                    <div>
+                      <strong className="text-blue-500 dark:text-blue-400">Entrenamiento prescrito:</strong> {infoSeg.ejercicio}
+                    </div>
+                    <div className="text-cyan-600 dark:text-cyan-400 font-semibold shrink-0">
+                      {infoSeg.simetriaVsOpuesto}
+                    </div>
                   </div>
                 </div>
+                <details key={segmentoSeleccionado} className="md:hidden mt-2">
+                  <summary className="text-[11px] font-bold text-blue-400 cursor-pointer">Ver diagnóstico</summary>
+                  <p className={`text-xs mt-2 leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                    {infoSeg.evaluacion}
+                  </p>
+                  <p className="text-[11px] mt-2 text-slate-400">
+                    <strong className="text-blue-400">Entrenamiento:</strong> {infoSeg.ejercicio}
+                  </p>
+                </details>
               </div>
             );
           })()}
@@ -1210,7 +1231,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
                 </span>
               </div>
 
-              <p className={`text-xs sm:text-sm leading-relaxed italic border-l-2 border-cyan-500 pl-3 ${
+              <p className={`hidden md:block text-xs sm:text-sm leading-relaxed italic border-l-2 border-cyan-500 pl-3 ${
                 isDark ? 'text-slate-300' : 'text-slate-700'
               }`}>
                 "{fraseGuia}"
@@ -1246,7 +1267,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
                   </div>
                   <span className="text-[10px] font-mono font-bold text-slate-400">85 - 100 pts</span>
                 </div>
-                <p className={`text-[11px] mt-1.5 leading-snug ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                <p className={`hidden md:block text-[11px] mt-1.5 leading-snug ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                   Nivel óptimo sobresaliente. Excelente equilibrio corporal, masa muscular sólida y máxima resistencia táctica.
                 </p>
                 {nivelNumero === 3 && (
@@ -1269,7 +1290,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
                   </div>
                   <span className="text-[10px] font-mono font-bold text-slate-400">70 - 84 pts</span>
                 </div>
-                <p className={`text-[11px] mt-1.5 leading-snug ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                <p className={`hidden md:block text-[11px] mt-1.5 leading-snug ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                   Nivel intermedio aceptable. Mantiene bases operativas con oportunidad de reducir grasa y tonificar masa muscular.
                 </p>
                 {nivelNumero === 2 && (
@@ -1292,7 +1313,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
                   </div>
                   <span className="text-[10px] font-mono font-bold text-slate-400">&lt; 70 pts</span>
                 </div>
-                <p className={`text-[11px] mt-1.5 leading-snug ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                <p className={`hidden md:block text-[11px] mt-1.5 leading-snug ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                   Requiere atención y reacondicionamiento prioritario para recuperar estándares de salud y capacidad operativa.
                 </p>
                 {nivelNumero === 1 && (
@@ -1412,7 +1433,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
       </div>
 
       {/* SECCIÓN 4: 2 APARTADOS DIRECTOS - PLAN DE ENTRENAMIENTO Y PLAN DE NUTRICIÓN */}
-      <div className="space-y-4">
+      <div className={`${cardCls} rounded-3xl border p-4 sm:p-8 shadow-xl space-y-6 transition-colors duration-300`}>
         <div>
           <span className="text-xs font-black uppercase tracking-wider text-emerald-500">
             Prescripción Personalizada Directa
@@ -1420,7 +1441,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
           <h2 className={`text-xl sm:text-2xl font-black mt-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>
             Planes de Entrenamiento & Nutrición Asignados
           </h2>
-          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+          <p className={`hidden md:block text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
             Accede a las directrices de tu entrenador físico y nutricionista según tu somatotipo ({somatotipoActual}), edad y región.
           </p>
         </div>
@@ -1547,7 +1568,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
                   Calculadora calórica diaria
                 </h3>
 
-                <p className={`text-xs leading-relaxed line-clamp-2 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                <p className={`hidden md:block text-xs leading-relaxed line-clamp-2 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                   Guía tu día con TMB (sin deporte) o Ingesta Meta (con deporte). Registra desayuno, almuerzo y merienda; se guarda solo el día de hoy.
                 </p>
 
@@ -1600,7 +1621,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-5">
           
           {/* 1. Grasa Visceral */}
           <div 
@@ -1614,7 +1635,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
               significadoMilitar: 'En maniobras de combate y marchas de campaña, mantener este valor menor a 9 garantiza una función respiratoria y diafragmática sin sobrepresión interna, previniendo la fatiga temprana y el riesgo cardiovascular en personal operativo.',
               consejo: 'Prioriza fibra hidrosoluble (avena, verduras de hoja verde), elimina azúcares refinados y alcohol, e integra 2 sesiones semanales de trote o natación continua en Zona 2 (45 min).'
             })}
-            className={`rounded-2xl p-5 space-y-3 border transition-all cursor-pointer group hover:scale-[1.02] ${
+            className={`rounded-2xl p-3 sm:p-5 space-y-2 sm:space-y-3 border transition-all cursor-pointer group hover:scale-[1.02] ${
               isDark 
                 ? 'bg-slate-950/80 border-slate-800 hover:border-emerald-500/50 hover:shadow-lg hover:shadow-emerald-500/5' 
                 : 'bg-slate-50 border-slate-200 hover:border-emerald-500 hover:shadow-md'
@@ -1627,7 +1648,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
               </span>
               <Info className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-400 transition-colors" />
             </div>
-            <div className={`text-3xl font-black font-mono ${isDark ? 'text-white' : 'text-slate-900'}`}>
+            <div className={`text-2xl sm:text-3xl font-black font-mono leading-none ${isDark ? 'text-white' : 'text-slate-900'}`}>
               Nivel {medActual.grasaVisceral}
             </div>
             
@@ -1641,10 +1662,13 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
               ) : (
                 <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
               )}
-              <div className="text-xs font-bold leading-tight">
-                {grasaVisceralBien 
-                  ? 'Estado: BIEN (Saludable, órganos protegidos)' 
-                  : 'Estado: MAL (Nivel elevado, requiere atención)'}
+              <div className="text-[10px] sm:text-xs font-bold leading-tight">
+                <span className="sm:hidden">{grasaVisceralBien ? 'Bien' : 'Atención'}</span>
+                <span className="hidden sm:inline">
+                  {grasaVisceralBien
+                    ? 'Estado: BIEN (Saludable, órganos protegidos)'
+                    : 'Estado: MAL (Nivel elevado, requiere atención)'}
+                </span>
               </div>
             </div>
             <p className="text-[11px] text-blue-500 dark:text-blue-400 font-semibold pt-1">
@@ -1664,7 +1688,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
               significadoMilitar: 'El tejido muscular es el mayor demandante de energía metabólica. A mayor masa esquelética, mayor será tu TMB, lo que te permite quemar más energía incluso durante periodos de descanso, patrullaje vehicular o guardias pasivas.',
               consejo: `Nunca ingieras un total calórico inferior a tu TMB (${medActual.tmb} kcal). Si consumes menos de este piso basal, el cuerpo activará el modo de supervivencia, ralentizará el metabolismo y consumirá tu propia masa muscular para obtener energía.`
             })}
-            className={`rounded-2xl p-5 space-y-3 border transition-all cursor-pointer group hover:scale-[1.02] ${
+            className={`rounded-2xl p-3 sm:p-5 space-y-2 sm:space-y-3 border transition-all cursor-pointer group hover:scale-[1.02] ${
               isDark 
                 ? 'bg-slate-950/80 border-slate-800 hover:border-amber-500/50 hover:shadow-lg hover:shadow-amber-500/5' 
                 : 'bg-slate-50 border-slate-200 hover:border-amber-500 hover:shadow-md'
@@ -1677,11 +1701,12 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
               </span>
               <Info className="w-3.5 h-3.5 text-slate-400 group-hover:text-amber-400 transition-colors" />
             </div>
-            <div className={`text-3xl font-black font-mono ${isDark ? 'text-white' : 'text-slate-900'}`}>
-              {medActual.tmb} <span className="text-sm font-normal text-slate-400">kcal</span>
+            <div className={`text-2xl sm:text-3xl font-black font-mono leading-none ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              {medActual.tmb} <span className="text-xs sm:text-sm font-normal text-slate-400">kcal</span>
             </div>
             <p className="text-xs text-slate-400 leading-snug">
-              Calorías mínimas que quema tu cuerpo en reposo absoluto (cuando no haces ejercicio, solo para mantenerte con vida).
+              <span className="md:hidden">En reposo, sin ejercicio.</span>
+              <span className="hidden md:inline">Calorías mínimas que quema tu cuerpo en reposo absoluto (cuando no haces ejercicio, solo para mantenerte con vida).</span>
             </p>
             <p className="text-[11px] text-blue-500 dark:text-blue-400 font-semibold pt-1">
               Ver cálculo y recomendaciones &rarr;
@@ -1700,7 +1725,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
               significadoMilitar: 'Asegura que tus depósitos de glucógeno muscular permanezcan llenos para ejercicios tácticos de alta intensidad, facilitando una rápida síntesis proteica post-entrenamiento y evitando el catabolismo.',
               consejo: 'Distribución macro recomendada: 25-30% Proteínas de alto valor biológico (pollo, pescado, huevos), 50% Carbohidratos complejos regionales (plátano verde, papa, yuca, arroz) y 20-25% Grasas saludables (aguacate, aceite de oliva, frutos secos).'
             })}
-            className={`rounded-2xl p-5 space-y-3 border transition-all cursor-pointer group hover:scale-[1.02] ${
+            className={`rounded-2xl p-3 sm:p-5 space-y-2 sm:space-y-3 border transition-all cursor-pointer group hover:scale-[1.02] ${
               isDark 
                 ? 'bg-slate-950/80 border-cyan-500/40 hover:border-cyan-400 hover:shadow-lg hover:shadow-cyan-500/10' 
                 : 'bg-cyan-50/60 border-cyan-300 hover:border-cyan-500 hover:shadow-md'
@@ -1713,11 +1738,12 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
               </span>
               <Info className="w-3.5 h-3.5 text-cyan-500 group-hover:text-cyan-400 transition-colors" />
             </div>
-            <div className="text-3xl font-black text-cyan-500 dark:text-cyan-400 font-mono">
-              {ingestaCaloricaMeta} <span className="text-sm font-normal text-slate-400">kcal/día</span>
+            <div className="text-2xl sm:text-3xl font-black text-cyan-500 dark:text-cyan-400 font-mono leading-none">
+              {ingestaCaloricaMeta} <span className="text-[10px] sm:text-sm font-normal text-slate-400">kcal/día</span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 leading-snug">
-              Calorías diarias recomendadas cuando realizas deporte y entrenamiento físico para alcanzar tu objetivo operativo.
+              <span className="md:hidden">Con entrenamiento.</span>
+              <span className="hidden md:inline">Calorías diarias recomendadas cuando realizas deporte y entrenamiento físico para alcanzar tu objetivo operativo.</span>
             </p>
             <p className="text-[11px] text-cyan-600 dark:text-cyan-300 font-semibold pt-1">
               Ver distribución de macronutrientes &rarr;
@@ -1736,7 +1762,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
               significadoMilitar: 'Alineado con las tablas de aptitud física de las FF.AA., garantizando que alcances la máxima nota de evaluación física sin exceder el porcentaje reglamentario de grasa.',
               consejo: 'Prioriza siempre la composición corporal sobre la báscula tradicional: el objetivo no es solo pesar menos, sino mantener o elevar tu masa muscular mientras reduces tejido graso innecesario.'
             })}
-            className={`rounded-2xl p-5 space-y-3 border transition-all cursor-pointer group hover:scale-[1.02] ${
+            className={`rounded-2xl p-3 sm:p-5 space-y-2 sm:space-y-3 border transition-all cursor-pointer group hover:scale-[1.02] ${
               isDark 
                 ? 'bg-slate-950/80 border-slate-800 hover:border-blue-500/50 hover:shadow-lg hover:shadow-blue-500/5' 
                 : 'bg-slate-50 border-slate-200 hover:border-blue-500 hover:shadow-md'
@@ -1749,11 +1775,12 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
               </span>
               <Info className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-400 transition-colors" />
             </div>
-            <div className={`text-3xl font-black font-mono ${isDark ? 'text-white' : 'text-slate-900'}`}>
-              {medActual.pesoIdeal} <span className="text-sm font-normal text-slate-400">kg</span>
+            <div className={`text-2xl sm:text-3xl font-black font-mono leading-none ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              {medActual.pesoIdeal} <span className="text-xs sm:text-sm font-normal text-slate-400">kg</span>
             </div>
             <p className="text-xs text-slate-400 leading-snug">
-              Peso óptimo calculado para tu estructura ósea y estatura militar ({medActual.alturaCm} cm).
+              <span className="md:hidden">Para tu estatura ({medActual.alturaCm} cm).</span>
+              <span className="hidden md:inline">Peso óptimo calculado para tu estructura ósea y estatura militar ({medActual.alturaCm} cm).</span>
             </p>
             <p className="text-[11px] text-blue-500 dark:text-blue-400 font-semibold pt-1">
               Ver rango recomendado militar &rarr;
@@ -1772,7 +1799,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
               significadoMilitar: 'Cada kilo de grasa excedente es una carga estática que resta segundos en el test de las 2 millas, dificulta las pruebas de paso de pista y sobrecarga rodillas y columna en marchas forzadas con pertrechos.',
               consejo: 'Establece un déficit calórico controlado de 300-400 kcal/día combinando tu pauta de nutrición regional con ejercicio aeróbico continuo y entrenamiento funcional sin comprometer tu masa magra.'
             })}
-            className={`rounded-2xl p-5 space-y-3 border transition-all cursor-pointer group hover:scale-[1.02] ${
+            className={`rounded-2xl p-3 sm:p-5 space-y-2 sm:space-y-3 border transition-all cursor-pointer group hover:scale-[1.02] ${
               isDark 
                 ? 'bg-slate-950/80 border-slate-800 hover:border-rose-500/50 hover:shadow-lg hover:shadow-rose-500/5' 
                 : 'bg-slate-50 border-slate-200 hover:border-rose-500 hover:shadow-md'
@@ -1794,7 +1821,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
                 ? `Debes subir ${medActual.controlGrasa} kg` 
                 : 'Nivel óptimo'}
             </div>
-            <p className="text-xs text-slate-400 leading-snug">
+            <p className="hidden md:block text-xs text-slate-400 leading-snug">
               {medActual.controlGrasa < 0 
                 ? `Debes bajar ${Math.abs(medActual.controlGrasa)} kg de grasa corporal para desgravar peso innecesario.` 
                 : 'Tu nivel de grasa se encuentra en valores adecuados.'}
@@ -1816,7 +1843,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
               significadoMilitar: 'El músculo esquelético es tu blindaje anatómico. Brinda potencia de tracción para flexiones en barra, estabilidad para disparo táctico y protección ante caídas o impactos.',
               consejo: 'Aplica sobrecarga progresiva en ejercicios multiarticulares (dominadas, flexiones con lastre, sentadillas, peso muerto) y consume al menos 1.8g a 2.0g de proteína por kg de peso corporal al día.'
             })}
-            className={`rounded-2xl p-5 space-y-3 border transition-all cursor-pointer group hover:scale-[1.02] ${
+            className={`rounded-2xl p-3 sm:p-5 space-y-2 sm:space-y-3 border transition-all cursor-pointer group hover:scale-[1.02] ${
               medActual.controlMuscular > 0
                 ? (isDark
                     ? 'bg-slate-950/80 border-amber-500/40 hover:border-amber-400/60 hover:shadow-lg hover:shadow-amber-500/10'

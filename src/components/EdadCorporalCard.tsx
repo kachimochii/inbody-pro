@@ -102,7 +102,7 @@ export const EdadCorporalCard: React.FC<EdadCorporalCardProps> = ({
             <HeartPulse className="w-6 h-6 animate-pulse" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="hidden md:flex items-center gap-2">
               <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${badgeClass}`}>
                 Parámetro Vital InBody
               </span>
@@ -112,9 +112,10 @@ export const EdadCorporalCard: React.FC<EdadCorporalCardProps> = ({
               </span>
             </div>
             <h3 className={`text-xl sm:text-2xl font-black mt-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-              Edad Corporal vs. Edad Cronológica
+              <span className="md:hidden">Edad corporal</span>
+              <span className="hidden md:inline">Edad Corporal vs. Edad Cronológica</span>
             </h3>
-            <p className={`text-[10px] mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+            <p className={`hidden md:block text-[10px] mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
               Calculada automáticamente (grasa, visceral, músculo, piernas y nivel de salud). No usa edad del equipo.
             </p>
           </div>
@@ -225,7 +226,7 @@ export const EdadCorporalCard: React.FC<EdadCorporalCardProps> = ({
               />
             </div>
 
-            <p className={`text-xs leading-relaxed italic pt-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+            <p className={`hidden md:block text-xs leading-relaxed italic pt-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
               "{estadoMensaje}"
             </p>
           </div>

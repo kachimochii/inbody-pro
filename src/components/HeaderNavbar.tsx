@@ -146,7 +146,7 @@ export const HeaderNavbar: React.FC<HeaderNavbarProps> = ({
             ) : null}
 
             {/* Badge oficial del usuario/rol activo */}
-            <div className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl border text-xs font-extrabold shadow-sm ${currentRoleInfo.color}`}>
+            <div className={`${currentUser.role === 'usuario' ? 'hidden md:flex' : 'flex'} items-center gap-2 px-3.5 py-1.5 rounded-xl border text-xs font-extrabold shadow-sm ${currentRoleInfo.color}`}>
               {currentRoleInfo.icon}
               {currentUser.role === 'usuario' ? (
                 <div className="flex items-center gap-1.5">

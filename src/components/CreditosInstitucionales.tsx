@@ -101,7 +101,7 @@ export const CreditosInstitucionales: React.FC<CreditosInstitucionalesProps> = (
           técnico:
         </p>
 
-        <div className="relative mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="relative mt-4 grid grid-cols-2 gap-2 sm:gap-3">
           {cfg.equipo.map((c) => (
             <div key={c.id} className={`relative pl-3 py-3 pr-3 rounded-2xl border ${cellBg}`}>
               <span className="absolute left-0 top-2.5 bottom-2.5 w-0.5 rounded-full bg-amber-500/80" />
@@ -131,7 +131,7 @@ export const CreditosInstitucionales: React.FC<CreditosInstitucionalesProps> = (
               ) : (
                 <>
                   <p className={`text-[10px] font-bold uppercase tracking-wider ${gold}`}>{c.rol}</p>
-                  <p className={`mt-0.5 text-sm font-black tracking-wide ${title}`}>{c.nombre}</p>
+                  <p className={`mt-0.5 text-xs sm:text-sm font-black tracking-wide leading-snug ${title}`}>{c.nombre}</p>
                 </>
               )}
             </div>
