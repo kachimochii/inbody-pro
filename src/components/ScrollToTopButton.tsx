@@ -18,7 +18,7 @@ export const ScrollToTopButton: React.FC = () => {
       type="button"
       aria-label="Subir al inicio"
       onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-      className="fixed bottom-5 right-5 z-[80] w-11 h-11 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/30 border border-blue-400/30 flex items-center justify-center cursor-pointer transition-transform hover:-translate-y-0.5"
+      className="fixed bottom-3 right-1.5 z-[80] w-9 h-9 sm:bottom-5 sm:right-5 sm:w-11 sm:h-11 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/30 border border-blue-400/30 flex items-center justify-center cursor-pointer transition-transform hover:-translate-y-0.5"
     >
       <ArrowUp className="w-5 h-5" />
     </button>
