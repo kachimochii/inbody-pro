@@ -2,6 +2,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import { SomatotipoTipo, PlanEntrenamiento, FichaEdadCatalogo, BloqueEjercicioPlan } from '../../types/inbody';
 import { ConstructorRutinaModal, type ResultadoConstructorRutina } from '../ConstructorRutinaModal';
 import { calcularDuracionEstimadaMin } from '../../utils/rutinaInteractiva';
+import { resolverAnimacion } from '../../lib/ejerciciosService';
 import { DEFINICIONES_SOMATOTIPOS, GALERIA_ENTRENAMIENTO, VIDEOS_MOTIVACIONALES_BASE } from '../../data/mockData';
 import { readImageAsDataUrl } from '../../utils/localPersistence';
 import { uploadImageToStorage } from '../../lib/firestoreService';
@@ -937,7 +938,7 @@ export const EntrenadorDashboard: React.FC<EntrenadorDashboardProps> = ({
                       {formRutina.map((b) => (
                         <img
                           key={b.uid}
-                          src={b.animacion}
+                          src={resolverAnimacion(b.animacion)}
                           alt={b.nombre_es}
                           title={b.nombre_es}
                           loading="lazy"

@@ -25,6 +25,7 @@ import {
   buscarEjercicios,
   cargarEjercicios,
   guardarEjercicioPersonalizado,
+  resolverAnimacion,
   type Ejercicio,
   type EquipoEjercicio,
   type GrupoMuscular,
@@ -342,7 +343,7 @@ export const ConstructorRutinaModal: React.FC<ConstructorRutinaModalProps> = ({
                   {paginaVisible.map((ej) => (
                     <article key={ej.id} className="group relative rounded-2xl bg-slate-950 border border-slate-800 hover:border-emerald-500/60 overflow-hidden flex flex-col">
                       <div className="aspect-square bg-white">
-                        <img src={ej.animacion} alt={ej.nombre_es} loading="lazy" decoding="async" className="w-full h-full object-contain" />
+                        <img src={resolverAnimacion(ej.animacion)} alt={ej.nombre_es} loading="lazy" decoding="async" className="w-full h-full object-contain" />
                       </div>
                       <div className="p-2 flex-1 flex flex-col gap-1">
                         <p className="text-[11px] font-bold text-white leading-tight line-clamp-2" title={ej.nombre_es}>
@@ -474,7 +475,7 @@ const BloqueEditor: React.FC<BloqueEditorProps> = ({ bloque: b, indice, total, o
     <div className="rounded-2xl bg-slate-950 border border-slate-800 p-2.5 space-y-2">
       <div className="flex items-start gap-2">
         <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-[11px] font-black flex items-center justify-center shrink-0">{indice + 1}</span>
-        <img src={b.animacion} alt="" loading="lazy" className="w-14 h-14 rounded-xl object-contain bg-white shrink-0" />
+        <img src={resolverAnimacion(b.animacion)} alt="" loading="lazy" className="w-14 h-14 rounded-xl object-contain bg-white shrink-0" />
         <div className="min-w-0 flex-1">
           <p className="text-xs font-bold text-white leading-tight line-clamp-2">{b.nombre_es}</p>
           <p className="text-[9px] text-slate-500 uppercase tracking-wide truncate">

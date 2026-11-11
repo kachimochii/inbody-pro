@@ -46,15 +46,29 @@ export interface FiltrosEjercicios {
 
 /** Prefijo con el que el catálogo JSON referencia las animaciones locales. */
 const RUTA_ANIMACIONES_LOCAL = '/ejercicios-webp/';
+/**
+ * GIF originales (1323) públicos. En Vercel no van los webp locales (~152 MB, gitignore).
+ * {archivo} es el nombre, p. ej. 0001.gif
+ */
+const GIF_PUBLICOS =
+  'https://firebasestorage.googleapis.com/v0/b/gym-app-dfb70.firebasestorage.app/o/gifs%2F{archivo}?alt=media';
 /** Base efectiva: local (Vite/public) o CDN. Admite el marcador {archivo} para URLs de Firebase Storage. */
 export const EJERCICIOS_CDN_BASE = (import.meta.env.VITE_EXERCISES_CDN_URL || '/ejercicios-webp').replace(/\/+$/, '');
 
 export function resolverAnimacion(ruta: string): string {
-  if (!ruta.startsWith(RUTA_ANIMACIONES_LOCAL)) return ruta;
+  if (!ruta || !ruta.startsWith(RUTA_ANIMACIONES_LOCAL)) return ruta;
   const archivo = ruta.slice(RUTA_ANIMACIONES_LOCAL.length);
-  return EJERCICIOS_CDN_BASE.includes('{archivo}')
-    ? EJERCICIOS_CDN_BASE.replace('{archivo}', encodeURIComponent(archivo))
-    : `${EJERCICIOS_CDN_BASE}/${archivo}`;
+  const base = (import.meta.env.VITE_EXERCISES_CDN_URL || '').replace(/\/+$/, '');
+  if (base) {
+    return base.includes('{archivo}')
+      ? base.replace('{archivo}', encodeURIComponent(archivo))
+      : `${base}/${archivo}`;
+  }
+  if (import.meta.env.PROD) {
+    const gif = archivo.replace(/\.webp$/i, '.gif');
+    return GIF_PUBLICOS.replace('{archivo}', encodeURIComponent(gif));
+  }
+  return `${RUTA_ANIMACIONES_LOCAL}${archivo}`;
 }
 
 const COL_EJERCICIOS_CUSTOM = 'ejerciciosCustom';

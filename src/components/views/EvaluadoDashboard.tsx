@@ -43,6 +43,7 @@ import { GuiaInbodyModal } from '../GuiaInbodyModal';
 import { EdadCorporalCard } from '../EdadCorporalCard';
 import { CarneInbodyModal } from '../CarneInbodyModal';
 import { ManiquiSegmentalSvg, type SegmentoKey } from '../ManiquiSegmentalSvg';
+import { resolverAnimacion } from '../../lib/ejerciciosService';
 import { CambiarPinModal } from '../CambiarPinModal';
 import {
   buildDeltasHistorial,
@@ -2776,7 +2777,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
                                     {idx + 1}
                                   </span>
                                   <img
-                                    src={b.animacion}
+                                    src={resolverAnimacion(b.animacion)}
                                     alt={b.nombre_es}
                                     loading="lazy"
                                     className="w-14 h-14 rounded-xl object-contain bg-white shrink-0 border border-slate-700"

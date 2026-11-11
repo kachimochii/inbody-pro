@@ -19,6 +19,7 @@ import {
 import type { PlanEntrenamiento, SomatotipoTipo } from '../types/inbody';
 import type { BloqueEjercicioPlan } from '../types/inbody';
 import { FRASES_MANDO } from '../data/mockData';
+import { resolverAnimacion } from '../lib/ejerciciosService';
 import {
   asegurarRutinaInteractiva,
   calcularCaloriasQuemadas,
@@ -670,7 +671,7 @@ export const WorkoutPlayerModal: React.FC<WorkoutPlayerModalProps> = ({
         >
           {previewBloque && (
             <img
-              src={previewBloque.animacion}
+              src={resolverAnimacion(previewBloque.animacion)}
               alt={previewBloque.nombre_es}
               className="w-full h-full object-contain"
               decoding="async"
