@@ -42,6 +42,7 @@ import { SomatotipoModal } from '../SomatotipoModal';
 import { GuiaInbodyModal } from '../GuiaInbodyModal';
 import { EdadCorporalCard } from '../EdadCorporalCard';
 import { CarneInbodyModal } from '../CarneInbodyModal';
+import { ManiquiSegmentalSvg, type SegmentoKey } from '../ManiquiSegmentalSvg';
 import { CambiarPinModal } from '../CambiarPinModal';
 import {
   buildDeltasHistorial,
@@ -134,6 +135,19 @@ function calcularPosicionUnidad(score: number, unidad: string, extraScores: numb
   const ptsElite = Math.max(0, Math.ceil(eliteCutoff - score));
   const enElite = rank <= eliteCount;
   return { topPct, ptsElite, enElite, n };
+}
+
+type SegZona = SegmentoKey;
+
+function clampPct(n: number): number {
+  return Math.min(100, Math.max(0, n));
+}
+
+function colorBarraSegmento(pct: number): string {
+  if (pct >= 100) return 'bg-emerald-500';
+  if (pct >= 90) return 'bg-blue-500';
+  if (pct >= 80) return 'bg-amber-500';
+  return 'bg-rose-500';
 }
 
 export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({ 
@@ -471,15 +485,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
   
   const diffBrazos = Math.abs(masaBrazosD - masaBrazosI);
   const diffPiernas = Math.abs(masaPiernasD - masaPiernasI);
-  const esSimetrico = diffBrazos <= 0.3 && diffPiernas <= 0.4;
   const porcentajeSimetria = Math.round(100 - ((diffBrazos + diffPiernas) / (masaBrazosD + masaPiernasD || 1)) * 50);
-
-  const getSegmentalEval = (pct?: number) => {
-    if (!pct) return 'Normal';
-    if (pct >= 115) return 'Sobre';
-    if (pct >= 90) return 'Normal';
-    return 'Bajo';
-  };
 
   // Filtrado estricto: somatotipo + rango de edad (ficha) + sexo
   const sexoUser = String(user.sexo || 'M').toUpperCase().startsWith('F') ? 'F' : 'M';
@@ -914,7 +920,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
         </div>
 
         {/* Primero: 2 siluetas | Luego: texto de métricas */}
-        <div className="space-y-6">
+        <div className="space-y-3">
           <div className="grid grid-cols-2 gap-2 sm:gap-4 min-w-0">
             <div
               onClick={() => setModalSomatotipo(defActual)}
@@ -991,15 +997,221 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
             </div>
           </div>
 
-          {/* Luego el texto: grasa / músculo / simetría */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className={`p-3.5 rounded-2xl border ${isDark ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
-              <div className="flex items-center justify-between gap-2">
-                <span className={`text-xs font-bold flex items-center gap-1.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                  <Flame className="w-4 h-4 text-rose-400" />
-                  <span>Grasa Corporal</span>
+        </div>
+
+        {(() => {
+            const fatScale = Math.max(40, medActual.rangoPbfMax * 1.35, medActual.pctGrasa + 6, 1);
+            const fatPos = clampPct((medActual.pctGrasa / fatScale) * 100);
+            const fatMinPos = clampPct((medActual.rangoPbfMin / fatScale) * 100);
+            const fatMaxPos = clampPct((medActual.rangoPbfMax / fatScale) * 100);
+            const smmScale = Math.max(medActual.rangoSmmMax * 1.15, medActual.musculoKg, 1);
+            const smmPos = clampPct((medActual.musculoKg / smmScale) * 100);
+            const smmMinPos = clampPct((medActual.rangoSmmMin / smmScale) * 100);
+            const smmMaxPos = clampPct((medActual.rangoSmmMax / smmScale) * 100);
+            const armMax = Math.max(masaBrazosI, masaBrazosD, 0.01);
+            const legMax = Math.max(masaPiernasI, masaPiernasD, 0.01);
+            const zonas: {
+              id: SegZona;
+              label: string;
+              musculo: number;
+              musculoPct: number;
+              grasaSeg: number;
+              icon: string;
+            }[] = [
+              { id: 'BD', label: 'B. Der.', musculo: masaBrazosD, musculoPct: seg.musculoBDPct ?? 105, grasaSeg: seg.grasaBD ?? 1.30, icon: '🦾' },
+              { id: 'BI', label: 'B. Izq.', musculo: masaBrazosI, musculoPct: seg.musculoBIPct ?? 104, grasaSeg: seg.grasaBI ?? 1.28, icon: '🦾' },
+              { id: 'TR', label: 'Tronco', musculo: masaTronco, musculoPct: seg.musculoTRPct ?? 105, grasaSeg: seg.grasaTR ?? 8.50, icon: '🛡️' },
+              { id: 'PD', label: 'P. Der.', musculo: masaPiernasD, musculoPct: seg.musculoPDPct ?? 104, grasaSeg: seg.grasaPD ?? 2.50, icon: '🦵' },
+              { id: 'PI', label: 'P. Izq.', musculo: masaPiernasI, musculoPct: seg.musculoPIPct ?? 103, grasaSeg: seg.grasaPI ?? 2.48, icon: '🦵' },
+            ];
+            const infoSeg = {
+              BD: {
+                corto: 'Brazo derecho',
+                musculo: masaBrazosD,
+                musculoPct: seg.musculoBDPct ?? 105,
+                grasa: seg.grasaBD ?? 1.30,
+                evaluacion: 'Masa magra adecuada para empuje, tiro táctico y transporte de armamento militar.',
+                simetriaVsOpuesto: `${Math.abs(masaBrazosD - masaBrazosI).toFixed(2)} kg vs Brazo Izq.`,
+              },
+              BI: {
+                corto: 'Brazo izquierdo',
+                musculo: masaBrazosI,
+                musculoPct: seg.musculoBIPct ?? 104,
+                grasa: seg.grasaBI ?? 1.28,
+                evaluacion: 'Excelente tono y simetría bilateral con el brazo dominante.',
+                simetriaVsOpuesto: `${Math.abs(masaBrazosD - masaBrazosI).toFixed(2)} kg vs Brazo Der.`,
+              },
+              TR: {
+                corto: 'Tronco',
+                musculo: masaTronco,
+                musculoPct: seg.musculoTRPct ?? 105,
+                grasa: seg.grasaTR ?? 8.50,
+                evaluacion: 'Núcleo vertebral y caja torácica con densidad muscular sólida para soportar chaleco táctico y carga.',
+                simetriaVsOpuesto: 'Eje axial. Soporte de carga a las 4 extremidades.',
+              },
+              PD: {
+                corto: 'Pierna derecha',
+                musculo: masaPiernasD,
+                musculoPct: seg.musculoPDPct ?? 104,
+                grasa: seg.grasaPD ?? 2.50,
+                evaluacion: 'Potencia de propulsión y amortiguación para marcha con mochila y zancadas continuas.',
+                simetriaVsOpuesto: `${Math.abs(masaPiernasD - masaPiernasI).toFixed(2)} kg vs Pierna Izq.`,
+              },
+              PI: {
+                corto: 'Pierna izquierda',
+                musculo: masaPiernasI,
+                musculoPct: seg.musculoPIPct ?? 103,
+                grasa: seg.grasaPI ?? 2.48,
+                evaluacion: 'Soporte estructural sólido y equilibrio neuromuscular en zancada y saltos.',
+                simetriaVsOpuesto: `${Math.abs(masaPiernasD - masaPiernasI).toFixed(2)} kg vs Pierna Der.`,
+              },
+            }[segmentoSeleccionado];
+            const musculoBarW = clampPct(infoSeg.musculoPct);
+            const grasaBarW = clampPct((infoSeg.grasa / Math.max(infoSeg.musculo + infoSeg.grasa, 0.01)) * 100);
+
+            return (
+        <div className={`pt-2 border-t ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              <span className="md:hidden">Zonas del cuerpo</span>
+              <span className="hidden md:inline">5 segmentos corporales</span>
+            </span>
+            <span className="text-[10px] text-blue-500 font-bold flex items-center gap-1">
+              <span className="md:hidden">Toca una zona</span>
+              <span className="hidden md:inline">Clic en maniquí o zona</span>
+              <ChevronRight className="w-3 h-3" />
+            </span>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)_minmax(0,1.15fr)] gap-2 items-stretch">
+            <div className={`rounded-xl border flex items-center justify-center p-2 min-h-[260px] ${
+              isDark ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-50 border-slate-200'
+            }`}>
+              <ManiquiSegmentalSvg
+                selected={segmentoSeleccionado}
+                onSelect={setSegmentoSeleccionado}
+                sexo={selectedGender}
+                isDark={isDark}
+                metrics={{
+                  BD: { musculoKg: masaBrazosD, musculoPct: seg.musculoBDPct ?? 105, grasaKg: seg.grasaBD ?? 1.30 },
+                  BI: { musculoKg: masaBrazosI, musculoPct: seg.musculoBIPct ?? 104, grasaKg: seg.grasaBI ?? 1.28 },
+                  TR: { musculoKg: masaTronco, musculoPct: seg.musculoTRPct ?? 105, grasaKg: seg.grasaTR ?? 8.50 },
+                  PD: { musculoKg: masaPiernasD, musculoPct: seg.musculoPDPct ?? 104, grasaKg: seg.grasaPD ?? 2.50 },
+                  PI: { musculoKg: masaPiernasI, musculoPct: seg.musculoPIPct ?? 103, grasaKg: seg.grasaPI ?? 2.48 },
+                }}
+              />
+            </div>
+            <div className="min-w-0 h-full flex flex-col gap-1.5">
+                {(() => {
+                  const renderZona = (id: SegZona, variant: 'tile' | 'wide' = 'tile') => {
+                    const z = zonas.find((x) => x.id === id)!;
+                    const isTile = variant === 'tile';
+                    return (
+                      <button
+                        key={z.id}
+                        type="button"
+                        onClick={() => setSegmentoSeleccionado(z.id)}
+                        className={`flex flex-col border transition-all cursor-pointer ${
+                          isTile
+                            ? 'aspect-[5/2] items-center justify-center text-center px-2 py-1.5 rounded-xl'
+                            : 'min-h-[72px] justify-center px-2.5 py-2 rounded-xl'
+                        } ${
+                          segmentoSeleccionado === z.id
+                            ? 'bg-cyan-500/15 border-cyan-400 ring-1 ring-cyan-400'
+                            : isDark ? 'bg-slate-900 border-slate-800 hover:border-slate-700' : 'bg-slate-100 border-slate-200 hover:border-slate-300'
+                        }`}
+                      >
+                        <span className={`${isTile ? 'text-base' : 'text-sm'} leading-none`}>{z.icon}</span>
+                        <span className="mt-1 text-[9px] text-slate-400 font-semibold">{z.label}</span>
+                        <span className={`mt-0.5 font-black font-mono leading-tight ${isDark ? 'text-white' : 'text-slate-900'} ${isTile ? 'text-[13px]' : 'text-sm'}`}>
+                          {z.musculo.toFixed(z.id === 'TR' ? 1 : 2)}
+                          <span className="text-[8px] font-semibold text-slate-500"> kg</span>
+                          <span className={`ml-1 text-[9px] font-black ${
+                            z.musculoPct >= 100 ? 'text-emerald-400' : z.musculoPct >= 90 ? 'text-blue-400' : 'text-amber-400'
+                          }`}>
+                            {z.musculoPct}%
+                          </span>
+                        </span>
+                        <div className={`mt-1.5 h-1 rounded-full overflow-hidden ${isTile ? 'w-[78%]' : 'w-full'} ${isDark ? 'bg-slate-800' : 'bg-slate-200'}`}>
+                          <div
+                            className={`h-full rounded-full ${colorBarraSegmento(z.musculoPct)}`}
+                            style={{ width: `${clampPct(z.musculoPct)}%` }}
+                          />
+                        </div>
+                        <span className="mt-1 text-[8px] text-amber-400/80 font-semibold">
+                          Grasa {z.grasaSeg.toFixed(1)} kg
+                        </span>
+                      </button>
+                    );
+                  };
+                  return (
+                    <>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {renderZona('BD')}
+                        {renderZona('BI')}
+                      </div>
+                      {renderZona('TR', 'wide')}
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {renderZona('PD')}
+                        {renderZona('PI')}
+                      </div>
+                    </>
+                  );
+                })()}
+
+                <div className={`mt-auto shrink-0 p-2 rounded-xl border ${
+                  isDark ? 'bg-slate-900/90 border-blue-500/30' : 'bg-blue-50/80 border-blue-200'
+                }`}>
+                  <div className="flex flex-wrap items-center justify-between gap-1">
+                    <span className="text-[10px] font-black text-blue-400 tracking-wide truncate">
+                      Diagnóstico: {infoSeg.corto}
+                    </span>
+                    <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-md border shrink-0 ${
+                      isDark
+                        ? 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30'
+                        : 'bg-cyan-50 text-cyan-700 border-cyan-200'
+                    }`}>
+                      {infoSeg.simetriaVsOpuesto}
+                    </span>
+                  </div>
+                  <div className="mt-1 grid grid-cols-2 gap-1">
+                    <div className={`rounded-md border px-1.5 py-0.5 ${
+                      isDark ? 'bg-blue-500/10 border-blue-500/25' : 'bg-blue-50 border-blue-200'
+                    }`}>
+                      <span className={`text-[9px] font-black ${isDark ? 'text-blue-200' : 'text-blue-800'}`}>
+                        💪 {infoSeg.musculo.toFixed(2)} kg ({infoSeg.musculoPct}%)
+                      </span>
+                      <div className={`mt-0.5 h-1 rounded-full overflow-hidden ${isDark ? 'bg-slate-800' : 'bg-blue-100'}`}>
+                        <div
+                          className={`h-full rounded-full ${infoSeg.musculoPct >= 100 ? 'bg-emerald-400' : 'bg-blue-500'}`}
+                          style={{ width: `${musculoBarW}%` }}
+                        />
+                      </div>
+                    </div>
+                    <div className={`rounded-md border px-1.5 py-0.5 ${
+                      isDark ? 'bg-rose-500/10 border-rose-500/25' : 'bg-amber-50 border-amber-200'
+                    }`}>
+                      <span className={`text-[9px] font-black ${isDark ? 'text-amber-200' : 'text-amber-800'}`}>
+                        🔥 {infoSeg.grasa.toFixed(2)} kg
+                      </span>
+                      <div className={`mt-0.5 h-1 rounded-full overflow-hidden ${isDark ? 'bg-slate-800' : 'bg-amber-100'}`}>
+                        <div className="h-full rounded-full bg-gradient-to-r from-amber-400 to-rose-400" style={{ width: `${grasaBarW}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                  <p className={`hidden md:block text-[10px] mt-1 leading-snug line-clamp-2 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                    {infoSeg.evaluacion}
+                  </p>
+                </div>
+              </div>
+
+              <div className="min-w-0 h-full grid grid-rows-3 gap-1.5">
+            <div className={`p-2 rounded-xl border flex flex-col justify-center ${isDark ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+              <div className="flex items-center justify-between gap-1.5">
+                <span className={`text-[11px] font-bold flex items-center gap-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                  <Flame className="w-3.5 h-3.5 text-rose-400" />
+                  Grasa Corporal
                 </span>
-                <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${
+                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md ${
                   medActual.pctGrasa < 18 ? 'bg-emerald-500/20 text-emerald-400' :
                   medActual.pctGrasa <= 24 ? 'bg-amber-500/20 text-amber-400' :
                   'bg-rose-500/20 text-rose-400'
@@ -1007,234 +1219,131 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
                   {medActual.pctGrasa < 18 ? 'Magro' : medActual.pctGrasa <= 24 ? 'Controlado' : 'Exceso'}
                 </span>
               </div>
-              <div className={`text-lg font-black font-mono mt-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              <div className={`text-sm font-black font-mono ${isDark ? 'text-white' : 'text-slate-900'}`}>
                 {medActual.grasaKg.toFixed(1)} kg ({medActual.pctGrasa.toFixed(1)}%)
               </div>
-              <p className="hidden md:block text-[11px] text-slate-400 mt-1 leading-snug">
-                {medActual.pctGrasa < 18
-                  ? 'Nivel magro y atlético, excelente control de tejido graso.'
-                  : medActual.pctGrasa <= 24
-                  ? 'Nivel saludable y controlado dentro de los estándares operativos.'
-                  : 'Porcentaje elevado; se recomienda reducir tejido graso con la pauta nutricional.'}
-              </p>
+              <div className={`relative mt-1 h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-slate-800' : 'bg-slate-200'}`}>
+                <div className="absolute inset-y-0 bg-amber-500" style={{ left: 0, width: `${fatMinPos}%` }} />
+                <div
+                  className="absolute inset-y-0 bg-emerald-500"
+                  style={{ left: `${fatMinPos}%`, width: `${Math.max(2, fatMaxPos - fatMinPos)}%` }}
+                />
+                <div
+                  className="absolute inset-y-0 bg-rose-500"
+                  style={{ left: `${fatMaxPos}%`, width: `${Math.max(0, 100 - fatMaxPos)}%` }}
+                />
+                <div
+                  className="absolute top-1/2 z-10 w-2 h-2 rounded-full bg-white border-2 border-slate-900 shadow"
+                  style={{ left: `${fatPos}%`, transform: 'translate(-50%, -50%)' }}
+                />
+              </div>
+              <div className="flex justify-between mt-0.5 text-[8px] font-bold text-slate-400">
+                <span>0%</span>
+                <span className="text-emerald-400">{medActual.rangoPbfMin}-{medActual.rangoPbfMax}%</span>
+                <span>{Math.round(fatScale)}%</span>
+              </div>
+              <span className={`mt-1 inline-flex text-[8px] font-black px-1.5 py-0.5 rounded-md border ${
+                medActual.controlGrasa < 0
+                  ? 'bg-rose-500/15 text-rose-300 border-rose-500/30'
+                  : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+              }`}>
+                {medActual.controlGrasa < 0
+                  ? '🎯 Bajar ' + Math.abs(medActual.controlGrasa) + ' kg grasa'
+                  : '✅ Grasa en rango óptimo'}
+              </span>
             </div>
 
-            <div className={`p-3.5 rounded-2xl border ${isDark ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
-              <div className="flex items-center justify-between gap-2">
-                <span className={`text-xs font-bold flex items-center gap-1.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                  <Dumbbell className="w-4 h-4 text-blue-400" />
-                  <span>Músculo Esquelético</span>
+            <div className={`p-2 rounded-xl border flex flex-col justify-center ${isDark ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+              <div className="flex items-center justify-between gap-1.5">
+                <span className={`text-[11px] font-bold flex items-center gap-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                  <Dumbbell className="w-3.5 h-3.5 text-blue-400" />
+                  Músculo Esquelético
                 </span>
-                <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${
+                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md ${
                   medActual.musculoKg >= medActual.rangoSmmMin ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
                 }`}>
                   {medActual.musculoKg >= medActual.rangoSmmMin ? 'Sólido' : 'Potenciar'}
                 </span>
               </div>
-              <div className={`text-lg font-black font-mono mt-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              <div className={`text-sm font-black font-mono ${isDark ? 'text-white' : 'text-slate-900'}`}>
                 {medActual.musculoKg.toFixed(1)} kg
               </div>
-              <p className="hidden md:block text-[11px] text-slate-400 mt-1 leading-snug">
-                {medActual.musculoKg >= medActual.rangoSmmMin
-                  ? 'Buena base de fuerza esquelética y tono muscular para tareas físicas.'
-                  : 'Masa muscular en rango a potenciar con entrenamiento progresivo.'}
-              </p>
+              <div className={`relative mt-1 h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-slate-800' : 'bg-slate-200'}`}>
+                <div
+                  className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-blue-500 to-emerald-400"
+                  style={{ width: `${smmPos}%` }}
+                />
+                <div
+                  className="absolute inset-y-0 border-x-2 border-white/70"
+                  style={{ left: `${smmMinPos}%`, width: `${Math.max(2, smmMaxPos - smmMinPos)}%` }}
+                />
+              </div>
+              <div className="flex justify-between mt-0.5 text-[8px] font-bold text-slate-400">
+                <span>0</span>
+                <span className="text-blue-400">{medActual.rangoSmmMin}-{medActual.rangoSmmMax} kg</span>
+                <span>{smmScale.toFixed(0)} kg</span>
+              </div>
+              <span className={`mt-1 inline-flex text-[8px] font-black px-1.5 py-0.5 rounded-md border ${
+                medActual.controlMuscular > 0
+                  ? 'bg-blue-500/15 text-blue-300 border-blue-500/30'
+                  : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+              }`}>
+                {medActual.controlMuscular > 0
+                  ? '💪 Subir +' + medActual.controlMuscular + ' kg músculo'
+                  : '✅ Masa muscular consolidada'}
+              </span>
             </div>
 
-            <div className={`p-3.5 rounded-2xl border ${isDark ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
-              <div className="flex items-center justify-between gap-2">
-                <span className={`text-xs font-bold flex items-center gap-1.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                  <Activity className="w-4 h-4 text-emerald-400" />
-                  <span>Simetría Corporal</span>
+            <div className={`p-2 rounded-xl border flex flex-col justify-center ${isDark ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+              <div className="flex items-center justify-between gap-1.5">
+                <span className={`text-[11px] font-bold flex items-center gap-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                  <Activity className="w-3.5 h-3.5 text-emerald-400" />
+                  Simetría Corporal
                 </span>
-                <span className="text-xs font-mono font-black text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
-                  {porcentajeSimetria}% Equilibrio
+                <span className="text-[9px] font-mono font-black text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-md border border-emerald-500/20">
+                  {porcentajeSimetria}%
                 </span>
               </div>
-              <p className="hidden md:block text-[11px] text-slate-400 mt-1 leading-snug">
-                {esSimetrico
-                  ? 'Excelente equilibrio entre tu lado izquierdo y derecho (brazos y piernas nivelados).'
-                  : 'Ligera variación entre extremidades; se recomienda trabajo unilateral compensatorio.'}
-              </p>
+              <div className="mt-1.5 space-y-1.5">
+                <div>
+                  <div className="flex items-center gap-1 text-[9px] font-bold text-slate-400 mb-0.5">
+                    <span className="w-12 shrink-0">Brazos</span>
+                    <span className="flex-1 text-cyan-400 text-right font-mono">I {masaBrazosI.toFixed(2)}</span>
+                    <span className="text-slate-500">⟷</span>
+                    <span className="flex-1 text-blue-400 font-mono">D {masaBrazosD.toFixed(2)}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className={`flex-1 h-1.5 rounded-full overflow-hidden flex justify-end ${isDark ? 'bg-slate-800' : 'bg-slate-200'}`}>
+                      <div className="h-full rounded-full bg-cyan-500" style={{ width: `${(masaBrazosI / armMax) * 100}%` }} />
+                    </div>
+                    <div className={`flex-1 h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-slate-800' : 'bg-slate-200'}`}>
+                      <div className="h-full rounded-full bg-blue-500" style={{ width: `${(masaBrazosD / armMax) * 100}%` }} />
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center gap-1 text-[9px] font-bold text-slate-400 mb-0.5">
+                    <span className="w-12 shrink-0">Piernas</span>
+                    <span className="flex-1 text-cyan-400 text-right font-mono">I {masaPiernasI.toFixed(2)}</span>
+                    <span className="text-slate-500">⟷</span>
+                    <span className="flex-1 text-blue-400 font-mono">D {masaPiernasD.toFixed(2)}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className={`flex-1 h-1.5 rounded-full overflow-hidden flex justify-end ${isDark ? 'bg-slate-800' : 'bg-slate-200'}`}>
+                      <div className="h-full rounded-full bg-cyan-500" style={{ width: `${(masaPiernasI / legMax) * 100}%` }} />
+                    </div>
+                    <div className={`flex-1 h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-slate-800' : 'bg-slate-200'}`}>
+                      <div className="h-full rounded-full bg-blue-500" style={{ width: `${(masaPiernasD / legMax) * 100}%` }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
+          </div>
           </div>
         </div>
-
-        {/* Debajo de las 2 siluetas: 5 segmentos */}
-        <div className={`pt-2 border-t ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-              <span className="md:hidden">Zonas del cuerpo</span>
-              <span className="hidden md:inline">Distribución en los 5 Segmentos Corporales:</span>
-            </span>
-            <span className="text-[10px] text-blue-500 dark:text-blue-400 font-bold flex items-center gap-1">
-              <span className="md:hidden">Toca una zona</span>
-              <span className="hidden md:inline">Haz clic en una zona para ver su diagnóstico</span>
-              <ChevronRight className="w-3 h-3" />
-            </span>
-          </div>
-          <div className="grid grid-cols-5 gap-2 text-center">
-            <button
-              onClick={() => setSegmentoSeleccionado('BD')}
-              className={`p-2 rounded-xl border transition-all cursor-pointer ${
-                segmentoSeleccionado === 'BD'
-                  ? 'bg-blue-600/20 border-blue-500 ring-2 ring-blue-500 shadow-md'
-                  : isDark ? 'bg-slate-900 border-slate-800 hover:border-slate-700' : 'bg-slate-100 border-slate-200 hover:border-slate-300'
-              }`}
-            >
-              <span className="text-[9px] text-slate-400 block font-semibold">Brazo Der.</span>
-              <span className={`text-xs font-bold font-mono ${isDark ? 'text-white' : 'text-slate-900'}`}>{masaBrazosD.toFixed(2)} kg</span>
-              <span className="text-[9px] text-emerald-400 block font-black">Normal</span>
-            </button>
-            <button
-              onClick={() => setSegmentoSeleccionado('BI')}
-              className={`p-2 rounded-xl border transition-all cursor-pointer ${
-                segmentoSeleccionado === 'BI'
-                  ? 'bg-blue-600/20 border-blue-500 ring-2 ring-blue-500 shadow-md'
-                  : isDark ? 'bg-slate-900 border-slate-800 hover:border-slate-700' : 'bg-slate-100 border-slate-200 hover:border-slate-300'
-              }`}
-            >
-              <span className="text-[9px] text-slate-400 block font-semibold">Brazo Izq.</span>
-              <span className={`text-xs font-bold font-mono ${isDark ? 'text-white' : 'text-slate-900'}`}>{masaBrazosI.toFixed(2)} kg</span>
-              <span className="text-[9px] text-emerald-400 block font-black">Normal</span>
-            </button>
-            <button
-              onClick={() => setSegmentoSeleccionado('TR')}
-              className={`p-2 rounded-xl border transition-all cursor-pointer ${
-                segmentoSeleccionado === 'TR'
-                  ? 'bg-blue-600/20 border-blue-500 ring-2 ring-blue-500 shadow-md'
-                  : isDark ? 'bg-slate-900 border-slate-800 hover:border-slate-700' : 'bg-slate-100 border-slate-200 hover:border-slate-300'
-              }`}
-            >
-              <span className="text-[9px] text-slate-400 block font-semibold">Tronco</span>
-              <span className={`text-xs font-bold font-mono ${isDark ? 'text-white' : 'text-slate-900'}`}>{masaTronco.toFixed(1)} kg</span>
-              <span className="text-[9px] text-emerald-400 block font-black">Óptimo</span>
-            </button>
-            <button
-              onClick={() => setSegmentoSeleccionado('PD')}
-              className={`p-2 rounded-xl border transition-all cursor-pointer ${
-                segmentoSeleccionado === 'PD'
-                  ? 'bg-blue-600/20 border-blue-500 ring-2 ring-blue-500 shadow-md'
-                  : isDark ? 'bg-slate-900 border-slate-800 hover:border-slate-700' : 'bg-slate-100 border-slate-200 hover:border-slate-300'
-              }`}
-            >
-              <span className="text-[9px] text-slate-400 block font-semibold">Pierna Der.</span>
-              <span className={`text-xs font-bold font-mono ${isDark ? 'text-white' : 'text-slate-900'}`}>{masaPiernasD.toFixed(2)} kg</span>
-              <span className="text-[9px] text-emerald-400 block font-black">Normal</span>
-            </button>
-            <button
-              onClick={() => setSegmentoSeleccionado('PI')}
-              className={`p-2 rounded-xl border transition-all cursor-pointer ${
-                segmentoSeleccionado === 'PI'
-                  ? 'bg-blue-600/20 border-blue-500 ring-2 ring-blue-500 shadow-md'
-                  : isDark ? 'bg-slate-900 border-slate-800 hover:border-slate-700' : 'bg-slate-100 border-slate-200 hover:border-slate-300'
-              }`}
-            >
-              <span className="text-[9px] text-slate-400 block font-semibold">Pierna Izq.</span>
-              <span className={`text-xs font-bold font-mono ${isDark ? 'text-white' : 'text-slate-900'}`}>{masaPiernasI.toFixed(2)} kg</span>
-              <span className="text-[9px] text-emerald-400 block font-black">Normal</span>
-            </button>
-          </div>
-
-          {(() => {
-            const infoSeg = {
-              BD: {
-                corto: 'Brazo derecho',
-                nombre: 'Brazo Derecho (Miembro Superior)',
-                musculo: masaBrazosD,
-                musculoPct: seg.musculoBDPct ?? 105,
-                grasa: seg.grasaBD ?? 1.30,
-                evaluacion: 'Masa magra adecuada para empuje, tiro táctico y transporte de armamento militar.',
-                ejercicio: 'Dominadas con agarre supino, fondos en paralelas y press de banca.',
-                simetriaVsOpuesto: `${Math.abs(masaBrazosD - masaBrazosI).toFixed(2)} kg de diferencia vs Brazo Izquierdo.`,
-              },
-              BI: {
-                corto: 'Brazo izquierdo',
-                nombre: 'Brazo Izquierdo (Miembro Superior)',
-                musculo: masaBrazosI,
-                musculoPct: seg.musculoBIPct ?? 104,
-                grasa: seg.grasaBI ?? 1.28,
-                evaluacion: 'Excelente tono y simetría bilateral con el brazo dominante.',
-                ejercicio: 'Flexiones asimétricas, curl unilateral con mancuerna y remo con polea.',
-                simetriaVsOpuesto: `${Math.abs(masaBrazosD - masaBrazosI).toFixed(2)} kg de diferencia vs Brazo Derecho.`,
-              },
-              TR: {
-                corto: 'Tronco',
-                nombre: 'Tronco y Zona Media (Core & Columna)',
-                musculo: masaTronco,
-                musculoPct: seg.musculoTRPct ?? 105,
-                grasa: seg.grasaTR ?? 8.50,
-                evaluacion: 'Núcleo vertebral y caja torácica con densidad muscular sólida para soportar chaleco táctico y carga.',
-                ejercicio: 'Planchas militares isométricas (2 min), elevación de piernas colgado y peso muerto.',
-                simetriaVsOpuesto: 'Eje axial central. Estabilidad y soporte de carga a las cuatro extremidades.',
-              },
-              PD: {
-                corto: 'Pierna derecha',
-                nombre: 'Pierna Derecha (Tren Inferior)',
-                musculo: masaPiernasD,
-                musculoPct: seg.musculoPDPct ?? 104,
-                grasa: seg.grasaPD ?? 2.50,
-                evaluacion: 'Potencia de propulsión y amortiguación para marcha con mochila y zancadas continuas.',
-                ejercicio: 'Sentadilla búlgara, zancadas tácticas con sobrecarga y prensa inclinada.',
-                simetriaVsOpuesto: `${Math.abs(masaPiernasD - masaPiernasI).toFixed(2)} kg de diferencia vs Pierna Izquierda.`,
-              },
-              PI: {
-                corto: 'Pierna izquierda',
-                nombre: 'Pierna Izquierda (Tren Inferior)',
-                musculo: masaPiernasI,
-                musculoPct: seg.musculoPIPct ?? 103,
-                grasa: seg.grasaPI ?? 2.48,
-                evaluacion: 'Soporte estructural sólido y equilibrio neuromuscular en zancada y saltos.',
-                ejercicio: 'Sentadilla goblet profunda, saltos pliométricos y subida al banco militar con carga.',
-                simetriaVsOpuesto: `${Math.abs(masaPiernasD - masaPiernasI).toFixed(2)} kg de diferencia vs Pierna Derecha.`,
-              },
-            }[segmentoSeleccionado];
-
-            return (
-              <div className={`mt-3 p-3.5 rounded-2xl border transition-all animate-in fade-in ${
-                isDark ? 'bg-slate-900/90 border-blue-500/30' : 'bg-blue-50/80 border-blue-200 shadow-sm'
-              }`}>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 border-b pb-2 border-slate-700/50 dark:border-slate-800">
-                  <div className="flex items-center gap-2">
-                    <Activity className="w-4 h-4 text-blue-500" />
-                    <span className="text-xs font-black text-blue-600 dark:text-blue-400 uppercase tracking-wider">
-                      <span className="md:hidden">{infoSeg.corto}</span>
-                      <span className="hidden md:inline">Diagnóstico: {infoSeg.nombre}</span>
-                    </span>
-                  </div>
-                  <span className={`text-xs font-mono font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                    <span className="md:hidden">{infoSeg.musculo.toFixed(1)} kg</span>
-                    <span className="hidden md:inline">{infoSeg.musculo.toFixed(2)} kg músculo ({infoSeg.musculoPct}% estándar) • {infoSeg.grasa.toFixed(2)} kg grasa</span>
-                  </span>
-                </div>
-                <div className="hidden md:block">
-                  <p className={`text-xs mt-2 leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                    {infoSeg.evaluacion}
-                  </p>
-                  <div className={`mt-2.5 pt-2 border-t flex flex-col sm:flex-row sm:items-center justify-between text-[11px] gap-2 ${
-                    isDark ? 'border-slate-800 text-slate-400' : 'border-blue-100 text-slate-600'
-                  }`}>
-                    <div>
-                      <strong className="text-blue-500 dark:text-blue-400">Entrenamiento prescrito:</strong> {infoSeg.ejercicio}
-                    </div>
-                    <div className="text-cyan-600 dark:text-cyan-400 font-semibold shrink-0">
-                      {infoSeg.simetriaVsOpuesto}
-                    </div>
-                  </div>
-                </div>
-                <details key={segmentoSeleccionado} className="md:hidden mt-2">
-                  <summary className="text-[11px] font-bold text-blue-400 cursor-pointer">Ver diagnóstico</summary>
-                  <p className={`text-xs mt-2 leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                    {infoSeg.evaluacion}
-                  </p>
-                  <p className="text-[11px] mt-2 text-slate-400">
-                    <strong className="text-blue-400">Entrenamiento:</strong> {infoSeg.ejercicio}
-                  </p>
-                </details>
-              </div>
             );
           })()}
-        </div>
       </div>
 
       {/* SECCIÓN 1: SISTEMA DE 3 NIVELES (70% IZQUIERDA / 30% SEMÁFORO DERECHA) */}
