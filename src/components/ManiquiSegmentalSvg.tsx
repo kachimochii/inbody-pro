@@ -92,7 +92,7 @@ export const ManiquiSegmentalSvg: React.FC<ManiquiSegmentalSvgProps> = ({
     <div className="relative flex h-full w-full items-center justify-center select-none">
       <svg
         viewBox="0 0 200 330"
-        className="h-full w-auto max-h-[340px] max-w-full overflow-visible"
+        className="h-auto w-auto max-h-[168px] lg:h-full lg:max-h-[340px] max-w-full overflow-visible"
         role="img"
         aria-label="Mapa anatómico segmental interactivo"
       >

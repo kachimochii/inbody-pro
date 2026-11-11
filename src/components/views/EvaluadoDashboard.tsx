@@ -872,7 +872,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
       </div>
 
       {/* SECCIÓN 2: ANATOMÍA Y SILUETA CORPORAL INBODY */}
-      <div className={`${cardCls} rounded-3xl border p-6 sm:p-8 shadow-xl space-y-6 transition-colors duration-300`}>
+      <div className={`${cardCls} rounded-3xl border p-3 sm:p-6 lg:p-8 shadow-xl space-y-3 sm:space-y-6 transition-colors duration-300`}>
         <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
           <div>
             <div className="flex items-center gap-2">
@@ -1084,7 +1084,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
             </span>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)_minmax(0,1.15fr)] gap-2 items-stretch">
-            <div className={`rounded-xl border flex items-center justify-center p-2 min-h-[260px] ${
+            <div className={`rounded-xl border flex items-center justify-center p-1 lg:p-2 max-lg:max-h-[180px] lg:min-h-[260px] overflow-hidden ${
               isDark ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-50 border-slate-200'
             }`}>
               <ManiquiSegmentalSvg
@@ -1101,7 +1101,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
                 }}
               />
             </div>
-            <div className="min-w-0 h-full flex flex-col gap-1.5">
+            <div className="min-w-0 h-full flex flex-col gap-1 lg:gap-1.5">
                 {(() => {
                   const renderZona = (id: SegZona, variant: 'tile' | 'wide' = 'tile') => {
                     const z = zonas.find((x) => x.id === id)!;
@@ -1113,17 +1113,17 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
                         onClick={() => setSegmentoSeleccionado(z.id)}
                         className={`flex flex-col border transition-all cursor-pointer ${
                           isTile
-                            ? 'aspect-[5/2] items-center justify-center text-center px-2 py-1.5 rounded-xl'
-                            : 'min-h-[72px] justify-center px-2.5 py-2 rounded-xl'
+                            ? 'items-center justify-center text-center px-1.5 py-1 lg:px-2 lg:py-1.5 lg:aspect-[5/2] rounded-lg lg:rounded-xl'
+                            : 'justify-center px-2 py-1 lg:px-2.5 lg:py-2 lg:min-h-[72px] rounded-lg lg:rounded-xl'
                         } ${
                           segmentoSeleccionado === z.id
                             ? 'bg-cyan-500/15 border-cyan-400 ring-1 ring-cyan-400'
                             : isDark ? 'bg-slate-900 border-slate-800 hover:border-slate-700' : 'bg-slate-100 border-slate-200 hover:border-slate-300'
                         }`}
                       >
-                        <span className={`${isTile ? 'text-base' : 'text-sm'} leading-none`}>{z.icon}</span>
-                        <span className="mt-1 text-[9px] text-slate-400 font-semibold">{z.label}</span>
-                        <span className={`mt-0.5 font-black font-mono leading-tight ${isDark ? 'text-white' : 'text-slate-900'} ${isTile ? 'text-[13px]' : 'text-sm'}`}>
+                        <span className={`${isTile ? 'text-xs lg:text-base' : 'text-xs lg:text-sm'} leading-none`}>{z.icon}</span>
+                        <span className="mt-0.5 lg:mt-1 text-[9px] text-slate-400 font-semibold">{z.label}</span>
+                        <span className={`mt-0.5 font-black font-mono leading-tight ${isDark ? 'text-white' : 'text-slate-900'} ${isTile ? 'text-[11px] lg:text-[13px]' : 'text-xs lg:text-sm'}`}>
                           {z.musculo.toFixed(z.id === 'TR' ? 1 : 2)}
                           <span className="text-[8px] font-semibold text-slate-500"> kg</span>
                           <span className={`ml-1 text-[9px] font-black ${
@@ -1132,7 +1132,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
                             {z.musculoPct}%
                           </span>
                         </span>
-                        <div className={`mt-1.5 h-1 rounded-full overflow-hidden ${isTile ? 'w-[78%]' : 'w-full'} ${isDark ? 'bg-slate-800' : 'bg-slate-200'}`}>
+                        <div className={`mt-1 h-1 rounded-full overflow-hidden ${isTile ? 'w-[78%]' : 'w-full'} ${isDark ? 'bg-slate-800' : 'bg-slate-200'}`}>
                           <div
                             className={`h-full rounded-full ${colorBarraSegmento(z.musculoPct)}`}
                             style={{ width: `${clampPct(z.musculoPct)}%` }}
@@ -1146,12 +1146,12 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
                   };
                   return (
                     <>
-                      <div className="grid grid-cols-2 gap-1.5">
+                      <div className="grid grid-cols-2 gap-1 lg:gap-1.5">
                         {renderZona('BD')}
                         {renderZona('BI')}
                       </div>
                       {renderZona('TR', 'wide')}
-                      <div className="grid grid-cols-2 gap-1.5">
+                      <div className="grid grid-cols-2 gap-1 lg:gap-1.5">
                         {renderZona('PD')}
                         {renderZona('PI')}
                       </div>
