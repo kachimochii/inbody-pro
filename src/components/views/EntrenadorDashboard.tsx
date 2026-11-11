@@ -1,6 +1,8 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { SomatotipoTipo, PlanEntrenamiento, FichaEdadCatalogo } from '../../types/inbody';
-import { DEFINICIONES_SOMATOTIPOS, GALERIA_ENTRENAMIENTO } from '../../data/mockData';
+import { SomatotipoTipo, PlanEntrenamiento, FichaEdadCatalogo, BloqueEjercicioPlan } from '../../types/inbody';
+import { ConstructorRutinaModal, type ResultadoConstructorRutina } from '../ConstructorRutinaModal';
+import { calcularDuracionEstimadaMin } from '../../utils/rutinaInteractiva';
+import { DEFINICIONES_SOMATOTIPOS, GALERIA_ENTRENAMIENTO, VIDEOS_MOTIVACIONALES_BASE } from '../../data/mockData';
 import { readImageAsDataUrl } from '../../utils/localPersistence';
 import { uploadImageToStorage } from '../../lib/firestoreService';
 import { extractYoutubeVideoId } from '../../utils/inbodyCalculations';
@@ -78,10 +80,13 @@ export const EntrenadorDashboard: React.FC<EntrenadorDashboardProps> = ({
   const [formPortadaUrl, setFormPortadaUrl] = useState('');
   const [formVideoUrl, setFormVideoUrl] = useState('');
   const [formMusicaFondoUrl, setFormMusicaFondoUrl] = useState('');
+  const [formVideosMotivacionales, setFormVideosMotivacionales] = useState(VIDEOS_MOTIVACIONALES_BASE.join('\n'));
   const [formDescripcion, setFormDescripcion] = useState('');
   const [formEnfoque, setFormEnfoque] = useState('Fuerza Táctica & Acondicionamiento Físico');
   const [formDiasSemana, setFormDiasSemana] = useState(4);
   const [formEjercicios, setFormEjercicios] = useState('');
+  const [formRutina, setFormRutina] = useState<BloqueEjercicioPlan[]>([]);
+  const [constructorAbierto, setConstructorAbierto] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -115,10 +120,13 @@ export const EntrenadorDashboard: React.FC<EntrenadorDashboardProps> = ({
     setFormPortadaUrl('https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=800&auto=format&fit=crop&q=80');
     setFormVideoUrl('https://www.youtube.com/watch?v=ml6cT4AZdqI');
     setFormMusicaFondoUrl('');
+    setFormVideosMotivacionales(VIDEOS_MOTIVACIONALES_BASE.join('\n'));
     setFormDescripcion('');
     setFormEnfoque('Fuerza Táctica & Rendimiento Operativo');
     setFormDiasSemana(4);
     setFormEjercicios('');
+    setFormRutina([]);
+    setConstructorAbierto(false);
     setUploadError('');
     setIsModalOpen(true);
   };
@@ -137,10 +145,18 @@ export const EntrenadorDashboard: React.FC<EntrenadorDashboardProps> = ({
     setFormPortadaUrl(plan.portadaUrl || plan.imagenUrl);
     setFormVideoUrl(plan.videoUrl || '');
     setFormMusicaFondoUrl(plan.musicaFondoUrl || '');
+    setFormVideosMotivacionales(
+      (plan.videosMotivacionalesUrls && plan.videosMotivacionalesUrls.length
+        ? plan.videosMotivacionalesUrls
+        : VIDEOS_MOTIVACIONALES_BASE
+      ).join('\n')
+    );
     setFormDescripcion(plan.descripcion);
     setFormEnfoque(plan.enfoque || 'Fuerza Táctica & Rendimiento');
     setFormDiasSemana(plan.diasPorSemana || 4);
     setFormEjercicios(plan.ejerciciosClave ? plan.ejerciciosClave.join('\n') : '');
+    setFormRutina(plan.rutinaInteractiva || []);
+    setConstructorAbierto(false);
     setUploadError('');
     setIsModalOpen(true);
   };
@@ -182,33 +198,68 @@ export const EntrenadorDashboard: React.FC<EntrenadorDashboardProps> = ({
     }
   };
 
-  const handleSavePlan = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formNombre.trim() || !fichaActiva) return;
-
-    const ejerciciosArray = formEjercicios
-      ? formEjercicios.split('\n').map(s => s.trim()).filter(Boolean)
+  const construirPlanBase = (
+    ficha: FichaEdadCatalogo,
+    rutina: BloqueEjercicioPlan[],
+    ejerciciosTexto: string
+  ): Omit<PlanEntrenamiento, 'id'> => {
+    const ejerciciosArray = ejerciciosTexto
+      ? ejerciciosTexto.split('\n').map(s => s.trim()).filter(Boolean)
       : ['Entrenamiento de fuerza funcional', 'Acondicionamiento cardiovascular'];
 
-    const base = {
+    return {
       nombre: formNombre.trim(),
       somatotipo: formSomatotipo,
-      fichaEdad: fichaActiva.nombre,
-      fichaId: fichaActiva.id,
-      rangoEdadMin: fichaActiva.edadMin,
-      rangoEdadMax: fichaActiva.edadMax,
+      fichaEdad: ficha.nombre,
+      fichaId: ficha.id,
+      rangoEdadMin: ficha.edadMin,
+      rangoEdadMax: ficha.edadMax,
       sexoDestino: formSexo,
       portadaUrl: formPortadaUrl.trim() || formImagenUrl.trim() || '/planes/PLAN1.jpeg',
       imagenUrl: formImagenUrl.trim() || '/planes/PLAN1.jpeg',
       videoUrl: formVideoUrl.trim(),
       musicaFondoUrl: formMusicaFondoUrl.trim(),
+      videosMotivacionalesUrls: formVideosMotivacionales
+        .split('\n')
+        .map((s) => s.trim())
+        .filter(Boolean),
       descripcion: formDescripcion.trim() || 'Plan de entrenamiento táctico militar.',
       enfoque: formEnfoque.trim(),
       diasPorSemana: Number(formDiasSemana),
       ejerciciosClave: ejerciciosArray,
+      rutinaInteractiva: rutina,
+      duracionEstimadaMin: calcularDuracionEstimadaMin(rutina),
       fechaCreacion: new Date().toISOString().split('T')[0],
       autor: isAdminMode ? 'Administrador Central' : 'Entrenador Táctico'
     };
+  };
+
+  const handleGuardarCircuito = (resultado: ResultadoConstructorRutina) => {
+    const ejerciciosTexto = resultado.ejerciciosClave.join('\n');
+    setFormRutina(resultado.rutinaInteractiva);
+    if (resultado.ejerciciosClave.length) setFormEjercicios(ejerciciosTexto);
+    setConstructorAbierto(false);
+
+    if (editingPlanId && fichaActiva && formNombre.trim()) {
+      onUpdatePlan({
+        id: editingPlanId,
+        ...construirPlanBase(
+          fichaActiva,
+          resultado.rutinaInteractiva,
+          resultado.ejerciciosClave.length ? ejerciciosTexto : formEjercicios
+        ),
+      });
+      showNotify(`Circuito guardado en "${formNombre}" (${resultado.rutinaInteractiva.length} bloques · ~${resultado.duracionEstimadaMin} min).`);
+    } else {
+      showNotify('Circuito listo. Se guardará al pulsar "Almacenar plan".');
+    }
+  };
+
+  const handleSavePlan = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formNombre.trim() || !fichaActiva) return;
+
+    const base = construirPlanBase(fichaActiva, formRutina, formEjercicios);
 
     if (editingPlanId) {
       onUpdatePlan({ id: editingPlanId, ...base });
@@ -819,6 +870,22 @@ export const EntrenadorDashboard: React.FC<EntrenadorDashboardProps> = ({
                 </span>
               </div>
 
+              <div>
+                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                  Videos motivacionales (YouTube / Shorts, uno por línea)
+                </label>
+                <textarea
+                  value={formVideosMotivacionales}
+                  onChange={(e) => setFormVideosMotivacionales(e.target.value)}
+                  rows={3}
+                  placeholder={'https://www.youtube.com/watch?v=...\nhttps://www.youtube.com/shorts/...'}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white outline-none focus:border-amber-500 font-mono"
+                />
+                <span className="text-[10px] text-slate-500 block mt-1">
+                  El evaluado ve un video no visto al abrir el plan. Cuando termine la lista, no se repite hasta que agregue un link nuevo.
+                </span>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Días / semana</label>
@@ -852,6 +919,40 @@ export const EntrenadorDashboard: React.FC<EntrenadorDashboardProps> = ({
                 />
               </div>
 
+              <div className="space-y-2 p-4 rounded-2xl bg-gradient-to-br from-emerald-950/60 to-slate-950 border border-emerald-500/30">
+                <button
+                  type="button"
+                  onClick={() => setConstructorAbierto(true)}
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase tracking-wider shadow-lg shadow-emerald-600/30 cursor-pointer"
+                >
+                  <Dumbbell className="w-4 h-4" />
+                  Diseñar Circuito Interactivo con Animaciones
+                </button>
+                {formRutina.length > 0 ? (
+                  <>
+                    <p className="text-[11px] font-bold text-emerald-300">
+                      {formRutina.length} bloques · ~{calcularDuracionEstimadaMin(formRutina)} min estimados
+                    </p>
+                    <div className="flex gap-1.5 overflow-x-auto pb-1">
+                      {formRutina.map((b) => (
+                        <img
+                          key={b.uid}
+                          src={b.animacion}
+                          alt={b.nombre_es}
+                          title={b.nombre_es}
+                          loading="lazy"
+                          className="w-12 h-12 rounded-lg object-contain bg-white border border-slate-700 shrink-0"
+                        />
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-[10px] text-slate-500">
+                    Arme el circuito con los 1323 ejercicios animados; los ejercicios clave se rellenan solos.
+                  </p>
+                )}
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Ejercicios (uno por línea)</label>
                 <textarea
@@ -874,6 +975,16 @@ export const EntrenadorDashboard: React.FC<EntrenadorDashboardProps> = ({
           </div>
         </div>
       )}
+
+      <ConstructorRutinaModal
+        abierto={isModalOpen && constructorAbierto}
+        onCerrar={() => setConstructorAbierto(false)}
+        onGuardar={handleGuardarCircuito}
+        bloquesIniciales={formRutina}
+        somatotipo={formSomatotipo}
+        fichaEdad={fichaActiva?.nombre || ''}
+        nombrePlan={formNombre}
+      />
 
       {/* Vista previa: cómo lo ve el evaluado (con música real) */}
       {previewPlan && (() => {

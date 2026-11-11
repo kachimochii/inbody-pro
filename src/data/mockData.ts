@@ -1,4 +1,5 @@
-import { FraseMando, SomatotipoDefinicion, SomatotipoTipo, UserAccount, VideoComplemento, PlanNutricion, PlanEntrenamiento } from '../types/inbody';
+import { FraseMando, SomatotipoDefinicion, SomatotipoTipo, UserAccount, VideoComplemento, PlanNutricion, PlanEntrenamiento, RegionEcuador } from '../types/inbody';
+import { MENUS_RANCHO_ECUADOR, MenuRanchoDia } from './menusRanchoEcuador';
 
 export const CAPAS_BASE = {
   fondo: 'https://i.ibb.co/DmTyGbF/FONDO.png',
@@ -47,6 +48,13 @@ export const FRASES_MANDO: FraseMando[] = [
   { preventiva: "EL TALENTO PUEDE ABRIR PUERTAS...", ejecutiva: "¡PERO LA DISCIPLINA TE MANTIENE DENTRO!" },
   { preventiva: "CUANDO LA PRESIÓN AUMENTE...", ejecutiva: "¡DEMUESTRA DE QUÉ ESTÁS HECHO!" },
   { preventiva: "LOS GRANDES RESULTADOS NO LLEGAN POR CASUALIDAD...", ejecutiva: "¡LLEGAN CUANDO LA DISCIPLINA SE VUELVE HÁBITO!" }
+];
+
+/** Lista base de Shorts / videos tácticos (el entrenador puede ampliarla por plan). */
+export const VIDEOS_MOTIVACIONALES_BASE: string[] = [
+  'https://www.youtube.com/watch?v=ZXsQAXx_ao0',
+  'https://www.youtube.com/watch?v=mgmVGq6n-HA',
+  'https://www.youtube.com/watch?v=wnHW6o8WMas',
 ];
 
 export const DEFINICIONES_SOMATOTIPOS: Record<string, SomatotipoDefinicion> = {
@@ -824,165 +832,151 @@ export const MOCK_VIDEOS: VideoComplemento[] = [
   }
 ];
 
-export const MOCK_PLANES_NUTRICION: PlanNutricion[] = [
-  // SIERRA
-  {
-    id: 'nutri-sierra-01',
-    nombre: 'Menú Andino de Recomposición (Sierra)',
-    somatotipo: 'Tipo estándar',
-    region: 'Sierra',
-    imagenUrl: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&auto=format&fit=crop&q=80',
-    descripcion: 'Plato balanceado a base de trucha andina a la plancha, quinua perlada cocida con cúrcuma y salteado de brócoli con zanahoria andina. Excelente digestión y alto contenido de Omega-3.',
-    caloriasAprox: 2150,
-    proteinasG: 140,
-    carbosG: 210,
-    grasasG: 60,
-    alimentosRecomendados: ['Trucha andina', 'Quinua serrana', 'Papas al vapor con cáscara', 'Choclo tierno', 'Aguacate', 'Mote cocido'],
-    fechaCreacion: '2026-08-20',
-    autor: 'Lic. Nutrición Táctica Sierra'
-  },
-  {
-    id: 'nutri-sierra-02',
-    nombre: 'Deficit Táctico Andino con Pollo y Avena (Sierra)',
-    somatotipo: 'Tipo de sobrepeso muscular',
-    region: 'Sierra',
-    imagenUrl: 'https://images.unsplash.com/photo-1547592180-85f173990554?w=800&auto=format&fit=crop&q=80',
-    descripcion: 'Diseñado para reducir tejido adiposo sin perder masa muscular. Pechuga de pollo desmechada con caldo desgrasado, verduras andinas al vapor y porción controlada de choclo con queso fresco descremado.',
-    caloriasAprox: 1900,
-    proteinasG: 155,
-    carbosG: 170,
-    grasasG: 45,
-    alimentosRecomendados: ['Pechuga a la plancha', 'Sopa desgrasada de verduras', 'Espinaca y acelga', 'Queso fresco light', 'Agua de hierbas'],
-    fechaCreacion: '2026-08-22',
-    autor: 'Lic. Nutrición Táctica Sierra'
-  },
-  {
-    id: 'nutri-sierra-03',
-    nombre: 'Hipertrofia de Altura con Lentejas y Ternera (Sierra)',
-    somatotipo: 'Tipo muscular estándar',
-    region: 'Sierra',
-    imagenUrl: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&auto=format&fit=crop&q=80',
-    descripcion: 'Alto requerimiento proteico y energético. Menestra ligera de lentejas de la sierra con filete de lomo de ternera magra, arroz integral y ensalada de remolacha con limón.',
-    caloriasAprox: 2450,
-    proteinasG: 165,
-    carbosG: 260,
-    grasasG: 65,
-    alimentosRecomendados: ['Lomo fino magro', 'Lentejas andinas', 'Huevos enteros cocidos', 'Arroz integral', 'Moras y mortiño'],
-    fechaCreacion: '2026-08-25',
-    autor: 'Lic. Nutrición Táctica Sierra'
-  },
-
-  // COSTA
-  {
-    id: 'nutri-costa-01',
-    nombre: 'Plato Costeño de Pescado y Verde Asado (Costa)',
-    somatotipo: 'Tipo estándar',
-    region: 'Costa',
-    imagenUrl: 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=800&auto=format&fit=crop&q=80',
-    descripcion: 'Pescado blanco (corvina o tilapia) a la plancha aromatizado con ajo y cilantro, acompañado de plátano verde asado sin aceite y ensalada fresca de tomate, cebolla morada y limón sutil.',
-    caloriasAprox: 2200,
-    proteinasG: 145,
-    carbosG: 220,
-    grasasG: 55,
-    alimentosRecomendados: ['Corvina a la plancha', 'Verde cocinado o asado', 'Ceviche sin aceite', 'Yuca hervida', 'Tomate y pepino'],
-    fechaCreacion: '2026-08-18',
-    autor: 'Nutrición Sanidad Naval Costa'
-  },
-  {
-    id: 'nutri-costa-02',
-    nombre: 'Ceviche Táctico de Mariscos & Ensalada Criolla (Costa)',
-    somatotipo: 'Tipo de sobrepeso muscular',
-    region: 'Costa',
-    imagenUrl: 'https://images.unsplash.com/photo-1535400255456-984241443b29?w=800&auto=format&fit=crop&q=80',
-    descripcion: 'Altamente saciante, proteico y bajo en calorías. Ceviche de camarón y pescado sin azúcar añadida, con abundante zumo de limón fresco, tostado de chulpi en porción medida y aguacate hass.',
-    caloriasAprox: 1850,
-    proteinasG: 150,
-    carbosG: 160,
-    grasasG: 48,
-    alimentosRecomendados: ['Camarón cocido', 'Pescado fresco en ceviche', 'Chulpi medido', 'Aguacate', 'Agua de pipa (coco natural sin azúcar)'],
-    fechaCreacion: '2026-08-21',
-    autor: 'Nutrición Sanidad Naval Costa'
-  },
-  {
-    id: 'nutri-costa-03',
-    nombre: 'Encocado Ligero de Pescado Marino (Costa)',
-    somatotipo: 'Tipo musculoso desarrollado',
-    region: 'Costa',
-    imagenUrl: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=800&auto=format&fit=crop&q=80',
-    descripcion: 'Preparación reducida en grasa saturada usando leche de coco natural desgrasada, pimientos tricolores, filete de atún o albacora sellado y porción de arroz blanco con frijoles negros.',
-    caloriasAprox: 2500,
-    proteinasG: 170,
-    carbosG: 270,
-    grasasG: 70,
-    alimentosRecomendados: ['Atún fresco', 'Leche de coco natural', 'Frijol negro', 'Arroz', 'Maduro hervido'],
-    fechaCreacion: '2026-08-24',
-    autor: 'Nutrición Sanidad Naval Costa'
-  },
-
-  // ORIENTE / AMAZONÍA
-  {
-    id: 'nutri-oriente-01',
-    nombre: 'Maito Amazónico en Hoja de Bijao (Oriente)',
-    somatotipo: 'Tipo estándar',
-    region: 'Oriente',
-    imagenUrl: 'https://images.unsplash.com/photo-1574484284002-952d92456975?w=800&auto=format&fit=crop&q=80',
-    descripcion: 'Tradición amazónica limpia sin aceites: Filete de tilapia o paiche envuelto en hojas de bijao y cocinado al vapor/brasa con sal marina, acompañado de yuca tierna cocida y palmito fresco.',
-    caloriasAprox: 2100,
-    proteinasG: 140,
-    carbosG: 215,
-    grasasG: 45,
-    alimentosRecomendados: ['Tilapia en maito', 'Yuca cocida', 'Palmito fresco', 'Guayusa sin azúcar', 'Plátano verde amazónico'],
-    fechaCreacion: '2026-08-19',
-    autor: 'Nutrición Brigada de Selva'
-  },
-  {
-    id: 'nutri-oriente-02',
-    nombre: 'Pollo Campestre Amazónico con Yuca y Guayusa (Oriente)',
-    somatotipo: 'Tipo obeso edematoso',
-    region: 'Oriente',
-    imagenUrl: 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=800&auto=format&fit=crop&q=80',
-    descripcion: 'Plan con efecto diurético y antiinflamatorio para eliminar retención de líquidos. Pollo criollo magro cocido a las hierbas amazónicas, infusión fría de guayusa diurética y ensalada de palmito silvestre.',
-    caloriasAprox: 1800,
-    proteinasG: 150,
-    carbosG: 155,
-    grasasG: 40,
-    alimentosRecomendados: ['Pechuga de pollo a las hierbas', 'Infusión de Guayusa', 'Palmito', 'Cúrcuma fresca', 'Yuca al vapor'],
-    fechaCreacion: '2026-08-23',
-    autor: 'Nutrición Brigada de Selva'
-  },
-  {
-    id: 'nutri-oriente-03',
-    nombre: 'Poder de Selva: Paiche a la Plancha y Plátano Asado (Oriente)',
-    somatotipo: 'Tipo muscular estándar',
-    region: 'Oriente',
-    imagenUrl: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800&auto=format&fit=crop&q=80',
-    descripcion: 'Máxima energía para patrullajes de selva: Paiche de criadero rico en colágeno y proteína densa, yuca al vapor, ensalada verde y fruta amazónica fresca (maracuyá o arazá).',
-    caloriasAprox: 2350,
-    proteinasG: 160,
-    carbosG: 240,
-    grasasG: 55,
-    alimentosRecomendados: ['Paiche / Pescado de río', 'Plátano asado', 'Yuca', 'Arazá / Maracuyá', 'Aguacate'],
-    fechaCreacion: '2026-08-26',
-    autor: 'Nutrición Brigada de Selva'
-  },
-
-  // GALÁPAGOS
-  {
-    id: 'nutri-galapagos-01',
-    nombre: 'Menú Marino Insular con Brujo y Vegetales Hidropónicos (Galápagos)',
-    somatotipo: 'Tipo estándar',
-    region: 'Galápagos',
-    imagenUrl: 'https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=800&auto=format&fit=crop&q=80',
-    descripcion: 'Pescado brujo o atún aleta amarilla sellado a la plancha, ensalada de vegetales hidropónicos de San Cristóbal y camote asado. Rico en minerales y electrolitos marinos.',
-    caloriasAprox: 2150,
-    proteinasG: 145,
-    carbosG: 200,
-    grasasG: 50,
-    alimentosRecomendados: ['Pescado brujo a la plancha', 'Vegetales hidropónicos', 'Camote hervido', 'Aceite de oliva crudo'],
-    fechaCreacion: '2026-08-27',
-    autor: 'Nutrición Base Insular Galápagos'
-  }
+export const SOMATOTIPOS_DEFICIT_GRASA: SomatotipoTipo[] = [
+  'Tipo obeso edematoso',
+  'Tipo de sobrepeso muscular',
+  'Tipo muscular con sobrepeso',
+  'Falta de tipo de ejercicio',
 ];
+
+export const SOMATOTIPOS_GANANCIA_MUSCULAR: SomatotipoTipo[] = [
+  'Tipo estándar',
+  'Tipo muscular estándar',
+  'Tipo delgado',
+  'Tipo musculoso magro',
+  'Tipo musculoso desarrollado',
+];
+
+export function familiaNutricion(somatotipo: SomatotipoTipo): 'deficit' | 'ganancia' {
+  return SOMATOTIPOS_DEFICIT_GRASA.includes(somatotipo) ? 'deficit' : 'ganancia';
+}
+
+export type AjustePorcionRancho = 'deficit' | 'estandar' | 'ganancia';
+
+export function ajustePorcionRancho(somatotipo: SomatotipoTipo): AjustePorcionRancho {
+  if (SOMATOTIPOS_DEFICIT_GRASA.includes(somatotipo)) return 'deficit';
+  if (somatotipo === 'Tipo estándar') return 'estandar';
+  return 'ganancia';
+}
+
+export function textoPorcionesRancho(somatotipo: SomatotipoTipo): string[] {
+  const modo = ajustePorcionRancho(somatotipo);
+  if (modo === 'deficit') {
+    return [
+      'Presa / proteína completa y el huevo: sírvetelos enteros.',
+      'Arroz: solo 1/2 cuchareta rasa (no la copeteada del rancho).',
+      'No combines arroz + papa, yuca o maduro frito en el mismo plato.',
+      'Prefiere fruta entera; evita jugos azucarados y postres del rancho.',
+    ];
+  }
+  if (modo === 'estandar') {
+    return [
+      'Porción normal de rancho: 1 cuchareta de arroz, menestra, presa, sopa y ensalada.',
+      'Refrigerio: 1 pan o fruta, sin repetir fritura en la misma comida.',
+    ];
+  }
+  return [
+    'Carbohidratos completos: arroz + menestra + verde, mote o yuca.',
+    'Doble aporte proteico: presa + huevos o lácteo (yogurt / leche).',
+    'Cubre tu Ingesta Calórica Meta; no te quedes solo con la sopa.',
+  ];
+}
+
+export const GALERIA_PLATOS_ECUADOR = [
+  { nombre: 'Seco de pollo casero (sin piel)', url: 'https://images.unsplash.com/photo-1598103442097-8b74394b95c6?w=800&auto=format&fit=crop&q=80', region: 'Sierra' },
+  { nombre: 'Caldo de gallina desgrasado', url: 'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=800&auto=format&fit=crop&q=80', region: 'Sierra' },
+  { nombre: 'Filete asado con menestra', url: 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?w=800&auto=format&fit=crop&q=80', region: 'Sierra' },
+  { nombre: 'Lomo, arroz, menestra y maduro al horno', url: 'https://images.unsplash.com/photo-1432139555190-58524dae6a55?w=800&auto=format&fit=crop&q=80', region: 'Sierra' },
+  { nombre: 'Trucha a la plancha y choclo', url: 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=800&auto=format&fit=crop&q=80', region: 'Sierra' },
+  { nombre: 'Encebollado de albacora', url: 'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=800&auto=format&fit=crop&q=80', region: 'Costa' },
+  { nombre: 'Pescado sudado y verde cocinado', url: 'https://images.unsplash.com/photo-1535400255456-984241443b29?w=800&auto=format&fit=crop&q=80', region: 'Costa' },
+  { nombre: 'Majado / bolón de verde asado y huevos', url: 'https://images.unsplash.com/photo-1525351484163-7529414344d8?w=800&auto=format&fit=crop&q=80', region: 'Costa' },
+  { nombre: 'Arroz, menestra y filete', url: 'https://images.unsplash.com/photo-1547592180-85f173990554?w=800&auto=format&fit=crop&q=80', region: 'Costa' },
+  { nombre: 'Maito amazónico en hoja de bijao', url: 'https://images.unsplash.com/photo-1574484284002-952d92456975?w=800&auto=format&fit=crop&q=80', region: 'Oriente' },
+  { nombre: 'Maito completo con yuca y aguacate', url: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800&auto=format&fit=crop&q=80', region: 'Oriente' },
+  { nombre: 'Pescado a la plancha con camote', url: 'https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=800&auto=format&fit=crop&q=80', region: 'Galápagos' },
+];
+
+function inferRegionRancho(menu: MenuRanchoDia, fallback: RegionEcuador): RegionEcuador {
+  const t = `${menu.tituloPlatoPrincipal} ${menu.almuerzo.segundo} ${menu.desayuno}`.toLowerCase();
+  if (/encebollado|cazuela|ceviche|albacora|bol[oó]n|majado|chifle|patac[oó]n|verde/.test(t)) return 'Costa';
+  if (/maito|palmito|guayusa/.test(t)) return 'Oriente';
+  if (/camote|hidrop[oó]nico|brujo/.test(t)) return 'Galápagos';
+  if (/mote|hornado|chugchucara|quinua|caldo|seco de|trucha/.test(t)) return 'Sierra';
+  return fallback;
+}
+
+function fotoRancho(menu: MenuRanchoDia, i: number): string {
+  const t = `${menu.tituloPlatoPrincipal} ${menu.almuerzo.segundo}`.toLowerCase();
+  const hit = GALERIA_PLATOS_ECUADOR.find((g) => {
+    const n = g.nombre.toLowerCase();
+    if (/encebollado/.test(t) && /encebollado/.test(n)) return true;
+    if (/pollo|seco/.test(t) && /pollo/.test(n)) return true;
+    if (/pescado|tilapia|corvina|albacora|filete/.test(t) && /pescado|trucha|camote/.test(n)) return true;
+    if (/menestra|lenteja|fr[eé]jol/.test(t) && /menestra|lenteja/.test(n)) return true;
+    if (/maito/.test(t) && /maito/.test(n)) return true;
+    if (/caldo/.test(t) && /caldo/.test(n)) return true;
+    return false;
+  });
+  return hit?.url || GALERIA_PLATOS_ECUADOR[i % GALERIA_PLATOS_ECUADOR.length].url;
+}
+
+function construirPlanesDesdeMenusRancho(): PlanNutricion[] {
+  const regiones: RegionEcuador[] = ['Sierra', 'Costa', 'Oriente', 'Galápagos'];
+  const planes: PlanNutricion[] = [];
+  MENUS_RANCHO_ECUADOR.forEach((menu, i) => {
+    (['deficit', 'ganancia'] as const).forEach((familia, fi) => {
+      const somas = familia === 'deficit' ? SOMATOTIPOS_DEFICIT_GRASA : SOMATOTIPOS_GANANCIA_MUSCULAR;
+      const somatotipo = somas[(menu.diaNumero - 1) % somas.length];
+      const region = inferRegionRancho(menu, regiones[(i + fi) % regiones.length]);
+      const macros: [number, number, number, number] =
+        familia === 'deficit' ? [1850, 150, 155, 42] : somatotipo === 'Tipo estándar' ? [2300, 155, 230, 60] : [2500, 170, 260, 68];
+      const ajuste = textoPorcionesRancho(somatotipo);
+      planes.push({
+        id: `rancho-dia-${String(menu.diaNumero).padStart(2, '0')}-${familia === 'deficit' ? 'def' : 'gan'}`,
+        nombre: menu.tituloPlatoPrincipal,
+        somatotipo,
+        region,
+        imagenUrl: fotoRancho(menu, i + fi),
+        descripcion:
+          `Menú real ESFORSFT · Día ${menu.diaNumero}. ` +
+          `Desayuno: ${menu.desayuno}. ` +
+          `Almuerzo: ${menu.almuerzo.sopa ? menu.almuerzo.sopa + ' + ' : ''}${menu.almuerzo.segundo}. ` +
+          `Merienda: ${menu.merienda.plato}.`,
+        caloriasAprox: macros[0],
+        proteinasG: macros[1],
+        carbosG: macros[2],
+        grasasG: macros[3],
+        alimentosRecomendados: [
+          `Desayuno: ${menu.desayuno}`,
+          `Refrigerio: ${menu.refrigerio}`,
+          `Almuerzo · sopa: ${menu.almuerzo.sopa || '—'}`,
+          `Almuerzo · segundo: ${menu.almuerzo.segundo}`,
+          `Merienda: ${menu.merienda.plato} · ${menu.merienda.bebida}`,
+          ...ajuste.map((linea) => `Porción (${somatotipo}): ${linea}`),
+        ],
+        fechaCreacion: '2026-08-01',
+        autor: 'Rancho ESFORSFT · Agosto 2026',
+      });
+    });
+  });
+  return planes;
+}
+
+export const MOCK_PLANES_NUTRICION: PlanNutricion[] = construirPlanesDesdeMenusRancho();
+
+export function esPlanNutricionObsoleto(plan: PlanNutricion): boolean {
+  if (/^rancho-dia-/.test(plan.id)) return false;
+  const nombre = String(plan.nombre || '');
+  if (
+    /hipertrofia de altura|men[uú] andino|vegetales hidrop|recomposici[oó]n|quinoa t[aá]ctica|lentejas y ternera|batido de|protocolo de hipertrofia/i.test(
+      nombre
+    )
+  ) {
+    return true;
+  }
+  return /^(nutri-sierra-|nutri-costa-|nutri-oriente-|nutri-galapagos-|plan-nutri-)/i.test(plan.id);
+}
 
 export const MOCK_PLANES_ENTRENAMIENTO: PlanEntrenamiento[] = [
   // === Planes originales (simple-inbody) ===
@@ -1246,18 +1240,6 @@ export const MOCK_PLANES_ENTRENAMIENTO: PlanEntrenamiento[] = [
     fechaCreacion: '2026-08-15',
     autor: 'Instructor Físico Táctico Militar'
   },
-];
-
-export const GALERIA_PLATOS_ECUADOR = [
-  { nombre: 'Trucha Andina con Quinua', url: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&auto=format&fit=crop&q=80', region: 'Sierra' },
-  { nombre: 'Pechuga a la Plancha con Verduras', url: 'https://images.unsplash.com/photo-1547592180-85f173990554?w=800&auto=format&fit=crop&q=80', region: 'Sierra' },
-  { nombre: 'Lentejas con Ternera Magra', url: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&auto=format&fit=crop&q=80', region: 'Sierra' },
-  { nombre: 'Pescado Blanco con Verde Asado', url: 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=800&auto=format&fit=crop&q=80', region: 'Costa' },
-  { nombre: 'Ceviche de Mariscos Fresco', url: 'https://images.unsplash.com/photo-1535400255456-984241443b29?w=800&auto=format&fit=crop&q=80', region: 'Costa' },
-  { nombre: 'Encocado Ligero con Atún', url: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=800&auto=format&fit=crop&q=80', region: 'Costa' },
-  { nombre: 'Maito Amazónico en Hoja de Bijao', url: 'https://images.unsplash.com/photo-1574484284002-952d92456975?w=800&auto=format&fit=crop&q=80', region: 'Oriente' },
-  { nombre: 'Pollo Campestre con Yuca', url: 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=800&auto=format&fit=crop&q=80', region: 'Oriente' },
-  { nombre: 'Pescado Brujo con Vegetales', url: 'https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=800&auto=format&fit=crop&q=80', region: 'Galápagos' }
 ];
 
 export const GALERIA_ENTRENAMIENTO = [

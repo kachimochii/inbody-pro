@@ -21,3 +21,9 @@ coverage/
 /CEDULAS_DEMO.md
 /*.pptx
 /*.pdf
+/ESFORSFT AGOSTO 2026.xlsx
+
+# Animaciones de ejercicios (~152 MB): se generan con convertir_gifs_a_webp.py
+/public/ejercicios-webp/
+/ejercicios_extraidos/gifs/
+/ejercicios_extraidos/webp/

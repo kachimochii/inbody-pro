@@ -1,26 +1,24 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
+import { Activity, TrendingDown, TrendingUp, Zap, Timer, RotateCcw } from 'lucide-react';
 import { InBodyRecord, Sexo } from '../types/inbody';
 import { resolveAnalisisCorporal } from '../utils/inbodyCalculations';
-import { useTheme } from '../context/ThemeContext';
 import {
-  Zap,
-  HeartPulse,
-  Sparkles,
-  Activity,
-  TrendingDown,
-  TrendingUp,
-  Award,
-  Flame,
-  Dumbbell,
-  ShieldCheck,
-  Timer,
-  AlertTriangle,
-} from 'lucide-react';
+  calcularAnalisisCorporal,
+  pctMusculoBrazosFromSegmental,
+  pctMusculoPiernasFromSegmental,
+  pctMusculoTroncoFromSegmental,
+  pctSmmFromKg,
+} from '../utils/composicionCorporal';
+import { useTheme } from '../context/ThemeContext';
 
 interface EdadCorporalCardProps {
   medicion: InBodyRecord;
   edadCronologica: number;
   sexo?: Sexo;
+}
+
+function nivelMedallaLabel(n: 1 | 2 | 3): string {
+  return n === 3 ? 'Nivel 3 · Excelente' : n === 2 ? 'Nivel 2 · Bueno' : 'Nivel 1 · A mejorar';
 }
 
 export const EdadCorporalCard: React.FC<EdadCorporalCardProps> = ({
@@ -29,273 +27,379 @@ export const EdadCorporalCard: React.FC<EdadCorporalCardProps> = ({
   sexo = 'M' as Sexo,
 }) => {
   const { isDark } = useTheme();
+  const [simOpen, setSimOpen] = useState(false);
+  const [bajarGrasa, setBajarGrasa] = useState(0);
+  const [subirMusculo, setSubirMusculo] = useState(0);
 
-  const analisis = resolveAnalisisCorporal(medicion, edadCronologica, sexo);
+  const analisis = useMemo(
+    () => resolveAnalisisCorporal(medicion, edadCronologica, sexo),
+    [medicion, edadCronologica, sexo]
+  );
+
+  const scoreSimulado = Math.min(
+    100,
+    Math.max(0, Math.round(medicion.inbodyScore + bajarGrasa * 2.2 + subirMusculo * 3.5))
+  );
+
+  const analisisSim = useMemo(() => {
+    if (bajarGrasa <= 0 && subirMusculo <= 0) return analisis;
+    const pesoSim = Math.max(40, medicion.peso - bajarGrasa + subirMusculo);
+    const grasaKg = Math.max(1.5, (medicion.pctGrasa / 100) * medicion.peso - bajarGrasa);
+    const pctGrasaSim = (grasaKg / pesoSim) * 100;
+    const musculoSim = medicion.musculoKg + subirMusculo;
+    return calcularAnalisisCorporal({
+      edad: edadCronologica,
+      sexo,
+      pctGrasa: pctGrasaSim,
+      pctSMM: pctSmmFromKg(musculoSim, pesoSim),
+      grasaVisceral: Math.max(1, Math.round(medicion.grasaVisceral - bajarGrasa * 0.35)),
+      pctMusculoPiernas: pctMusculoPiernasFromSegmental(
+        medicion.segmental?.musculoPDPct,
+        medicion.segmental?.musculoPIPct
+      ),
+      pctMusculoBrazos: pctMusculoBrazosFromSegmental(
+        medicion.segmental?.musculoBDPct,
+        medicion.segmental?.musculoBIPct
+      ),
+      pctMusculoTronco: pctMusculoTroncoFromSegmental(medicion.segmental?.musculoTRPct),
+      puntajeSalud: scoreSimulado,
+    });
+  }, [analisis, bajarGrasa, subirMusculo, medicion, edadCronologica, sexo, scoreSimulado]);
+
   const edadCorp = analisis.edadCorporal;
+  const edadReal = edadCronologica;
+  const diferencia = edadCorp - edadReal;
+  const { deltas } = analisis;
+  const pctSmm = pctSmmFromKg(medicion.musculoKg, medicion.peso);
 
-  const diferencia = edadCorp - edadCronologica;
-  const esMasJoven = diferencia < 0;
-  const esIgual = diferencia === 0;
-
-  // Semáforo: más joven = verde; hasta +5 = amarillo; más de +5 = rojo
-  let estadoColor: 'emerald' | 'amber' | 'rose' = 'emerald';
-  let estadoTitulo = 'Excelente — cuerpo más joven';
-  let estadoMensaje = `Tu masa muscular y metabolismo hacen que tu cuerpo rinda como el de alguien ${Math.abs(diferencia)} años más joven.`;
-  let badgeClass = isDark
-    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-emerald-500/20'
-    : 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-emerald-200/50';
-
-  if (diferencia > 5) {
-    estadoColor = 'rose';
-    estadoTitulo = 'Peligro — desgaste físico';
-    estadoMensaje = `Tu edad corporal supera por ${diferencia} años a tu edad real. El exceso de grasa y bajo tono muscular aceleran el envejecimiento metabólico.`;
-    badgeClass = isDark
-      ? 'bg-rose-500/20 text-rose-300 border-rose-500/40 shadow-rose-500/20'
-      : 'bg-rose-50 text-rose-700 border-rose-200 shadow-rose-200/50';
-  } else if (diferencia >= 0) {
-    estadoColor = 'amber';
-    estadoTitulo = esIgual ? 'Moderado — edades alineadas' : 'Moderado — ligera sobrecarga';
-    estadoMensaje = esIgual
-      ? 'Tu edad biológica coincide con tu edad real. Con más estímulo de fuerza podrás rejuvenecer tu metabolismo.'
-      : `Tu edad corporal está +${diferencia} años por encima. Ajustes en nutrición y entrenamiento devolverán tu juventud biológica.`;
-    badgeClass = isDark
-      ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-amber-500/20'
-      : 'bg-amber-50 text-amber-700 border-amber-200 shadow-amber-200/50';
-  }
-
+  const estadoColor =
+    diferencia > 2 ? 'text-red-500' : diferencia < -1 ? 'text-emerald-500' : 'text-amber-500';
+  const badgeClass =
+    diferencia > 2
+      ? 'bg-red-500/10 border-red-500/20'
+      : diferencia < -1
+        ? 'bg-emerald-500/10 border-emerald-500/20'
+        : 'bg-amber-500/10 border-amber-500/20';
   const corpBorder =
-    estadoColor === 'rose'
-      ? 'border-rose-500/60 shadow-rose-500/15'
-      : estadoColor === 'amber'
-        ? 'border-amber-500/60 shadow-amber-500/15'
-        : 'border-emerald-500/60 shadow-emerald-500/15';
+    diferencia > 2
+      ? 'border-red-500/70 shadow-[0_0_24px_rgba(239,68,68,0.28)]'
+      : diferencia < -1
+        ? 'border-emerald-500/70 shadow-[0_0_24px_rgba(16,185,129,0.28)]'
+        : 'border-amber-500/70 shadow-[0_0_24px_rgba(245,158,11,0.28)]';
   const corpAccent =
-    estadoColor === 'rose' ? 'text-rose-400' : estadoColor === 'amber' ? 'text-amber-400' : 'text-emerald-400';
+    diferencia > 2 ? 'text-red-400' : diferencia < -1 ? 'text-emerald-400' : 'text-amber-400';
+
+  const nivelNum = analisis.nivelSalud;
+  const nivelTexto = nivelNum === 3 ? 'Excelente' : nivelNum === 2 ? 'Bueno' : 'A mejorar';
+  const nivelColor =
+    nivelNum === 3 ? 'text-emerald-400' : nivelNum === 2 ? 'text-amber-400' : 'text-red-400';
+
+  const estadoMensaje =
+    diferencia > 2
+      ? 'Tu cuerpo opera con sobrecarga metabólica. Reduce grasa y viscerales para alinear la edad corporal con la cronológica.'
+      : diferencia < -1
+        ? 'Tu composición corporal te mantiene más joven que tu edad cronológica. Mantén músculo y control de grasa.'
+        : 'Edad corporal y edad real están alineadas. Conserva el equilibrio de músculo y grasa.';
+
+  const deltaSim = analisisSim.edadCorporal - edadCorp;
+  const simActiva = bajarGrasa > 0 || subirMusculo > 0;
+  const nivelSim = analisisSim.nivelSalud;
+
+  const badgeMusculo =
+    deltas.musculo < 0
+      ? '🟢 ' + deltas.musculo + ' años'
+      : deltas.musculo > 0
+        ? '🔴 +' + deltas.musculo + ' años'
+        : '🟢 0 años (Protege)';
+  const badgeGrasa =
+    deltas.grasa > 0 ? '🔴 +' + Math.round(deltas.grasa) + ' años' : '🟢 0 años (Óptimo)';
+  const badgeVisceral =
+    deltas.visceral > 0 ? '🔴 +' + deltas.visceral + ' años' : '🟢 0 años (Sano)';
+
+  const shellCls = isDark
+    ? 'bg-slate-900 border-slate-800 text-white'
+    : 'bg-white border-slate-200 text-slate-900 shadow-xl shadow-slate-200/50';
+  const innerCls = isDark
+    ? 'bg-slate-950/50 border-slate-800'
+    : 'bg-slate-50 border-slate-200';
+  const factorCls = isDark
+    ? 'bg-slate-950 border-slate-800'
+    : 'bg-slate-50 border-slate-200';
+  const titleCls = isDark ? 'text-white' : 'text-slate-900';
+  const valueCls = isDark ? 'text-white' : 'text-slate-900';
+  const mutedCls = isDark ? 'text-slate-400' : 'text-slate-500';
+  const simCls = isDark
+    ? 'bg-slate-950/80 border-slate-800'
+    : 'bg-slate-50 border-slate-200';
 
   return (
-    <div
-      className={`rounded-3xl border p-6 sm:p-7 transition-all shadow-xl relative overflow-hidden ${
-        isDark
-          ? 'bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 border-slate-800'
-          : 'bg-gradient-to-br from-white via-slate-50 to-blue-50/40 border-slate-200 text-slate-800'
-      }`}
-    >
-      <div
-        className={`absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl pointer-events-none ${
-          estadoColor === 'emerald'
-            ? 'bg-emerald-500/10'
-            : estadoColor === 'rose'
-              ? 'bg-rose-500/10'
-              : 'bg-amber-500/10'
-        }`}
-      />
-
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4 border-slate-800/80">
+    <div className={`${shellCls} border rounded-3xl p-6 shadow-xl`}>
+      <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div
-            className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg transition-transform hover:scale-105 ${
-              isDark
-                ? 'bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-blue-500/20'
-                : 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-blue-300/40'
-            }`}
-          >
-            <HeartPulse className="w-6 h-6 animate-pulse" />
+          <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500">
+            <Activity className="w-5 h-5" />
           </div>
           <div>
-            <div className="hidden md:flex items-center gap-2">
-              <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${badgeClass}`}>
-                Parámetro Vital InBody
-              </span>
-              <span className="flex items-center gap-1 text-[11px] font-bold text-cyan-400">
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Biomarcador de Juventud</span>
-              </span>
-            </div>
-            <h3 className={`text-xl sm:text-2xl font-black mt-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-              <span className="md:hidden">Edad corporal</span>
-              <span className="hidden md:inline">Edad Corporal vs. Edad Cronológica</span>
+            <h3 className={`text-lg font-black uppercase tracking-tight ${titleCls}`}>
+              Edad Corporal InBody 270S
             </h3>
-            <p className={`hidden md:block text-[10px] mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-              Calculada automáticamente (grasa, visceral, músculo, piernas y nivel de salud). No usa edad del equipo.
-            </p>
           </div>
         </div>
-
-        <div className={`px-4 py-2 rounded-2xl border text-right font-black text-xs sm:text-sm self-start sm:self-center shadow-sm ${badgeClass}`}>
-          {estadoTitulo}
+        <div
+          className={`px-3 py-1 rounded-lg border ${badgeClass} ${estadoColor} text-[10px] font-black uppercase tracking-widest`}
+        >
+          {diferencia > 0
+            ? `+${diferencia} Años vs Edad Real`
+            : diferencia < 0
+              ? `${diferencia} Años vs Edad Real`
+              : 'Edad Equilibrada'}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center pt-6">
-        <div className="lg:col-span-7 space-y-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* LADO IZQUIERDO: LAS DOS TARJETAS + EQUILIBRIO (REGLA DE ORO) */}
+        <div className="flex flex-col justify-center space-y-6">
           <div className="grid grid-cols-2 gap-4">
-            {/* PRIMERO: Edad Corporal (según el cuerpo) */}
-            <div
-              className={`p-4 sm:p-5 rounded-2xl border-2 text-center relative overflow-hidden transition-all shadow-lg ${corpBorder} ${
-                isDark
-                  ? 'bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950'
-                  : 'bg-gradient-to-b from-white via-slate-50 to-white'
-              }`}
-            >
-              <div className="absolute top-1.5 right-2">
-                <span
-                  className={`w-2.5 h-2.5 rounded-full inline-block ${
-                    estadoColor === 'rose'
-                      ? 'bg-rose-400 inbody-pulse-danger'
-                      : estadoColor === 'amber'
-                        ? 'bg-amber-400 inbody-pulse-warn'
-                        : 'bg-emerald-400'
-                  }`}
-                />
+            <div className={`${innerCls} p-4 rounded-2xl border-2 ${corpBorder} text-center`}>
+              <span
+                className={`text-[10px] font-black uppercase tracking-widest ${corpAccent} block mb-1`}
+              >
+                Edad según tu cuerpo
+              </span>
+              <div className={`text-4xl font-black ${estadoColor} flex items-center justify-center gap-1`}>
+                {edadCorp} <span className={`text-sm font-medium ${mutedCls}`}>años</span>
               </div>
-
-              <div className={`flex items-center justify-center gap-1.5 text-xs font-black mb-1 ${corpAccent}`}>
-                <Zap className="w-4 h-4" />
-                <span>Edad según tu cuerpo</span>
-              </div>
-
-              <div className={`text-4xl sm:text-5xl font-black font-mono tracking-tight ${corpAccent}`}>
-                {edadCorp}
-                <span className="text-sm font-normal opacity-80 ml-1">años</span>
-              </div>
-
-              <div className="mt-1 flex items-center justify-center gap-1 text-xs font-black">
-                {esMasJoven ? (
-                  <span className="text-emerald-400 flex items-center gap-0.5">
-                    <TrendingDown className="w-3.5 h-3.5" />
-                    <span>-{Math.abs(diferencia)} años (Más Joven)</span>
-                  </span>
-                ) : diferencia > 0 ? (
-                  <span className={`${diferencia > 5 ? 'text-rose-400' : 'text-amber-400'} flex items-center gap-0.5`}>
-                    <TrendingUp className="w-3.5 h-3.5" />
-                    <span>+{diferencia} años (Sobrecarga)</span>
-                  </span>
+              <div className="flex items-center justify-center mt-2">
+                {diferencia > 0 ? (
+                  <TrendingDown className="w-4 h-4 text-red-500 rotate-180" />
                 ) : (
-                  <span className="text-amber-400">Nivel Paritario (0 años)</span>
+                  <TrendingUp className="w-4 h-4 text-emerald-500" />
                 )}
+                <span className={`text-[10px] font-bold ml-1 ${estadoColor}`}>
+                  {diferencia > 0
+                    ? `+${diferencia} años (Sobrecarga)`
+                    : diferencia < 0
+                      ? `${Math.abs(diferencia)} años más joven`
+                      : 'En rango'}
+                </span>
               </div>
             </div>
-
-            {/* SEGUNDO: Edad Real */}
-            <div
-              className={`p-4 sm:p-5 rounded-2xl border text-center transition-all ${
-                isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-white border-slate-200 shadow-md shadow-slate-100'
-              }`}
-            >
-              <div className="flex items-center justify-center gap-1.5 text-xs text-slate-400 font-bold mb-1">
-                <Timer className="w-4 h-4 text-slate-400" />
-                <span>Edad Real (C.I.)</span>
+            <div className={`${innerCls} p-4 rounded-2xl border text-center`}>
+              <span className={`text-[10px] font-black uppercase tracking-widest ${mutedCls} block mb-1`}>
+                Edad Real (C.I.)
+              </span>
+              <div className={`text-4xl font-black ${valueCls} flex items-center justify-center gap-1`}>
+                {edadReal} <span className={`text-sm font-medium ${mutedCls}`}>años</span>
               </div>
-              <div className={`text-4xl sm:text-5xl font-black font-mono tracking-tight ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
-                {edadCronologica}
-                <span className="text-sm font-normal text-slate-400 ml-1">años</span>
+              <div className="flex items-center justify-center mt-2">
+                <Timer className={`w-4 h-4 ${mutedCls}`} />
+                <span className={`text-[10px] font-bold ml-1 ${mutedCls}`}>Cronológica InBody</span>
               </div>
-              <span className="text-[11px] text-slate-400 block mt-1">Fecha de nacimiento</span>
             </div>
           </div>
 
-          <div className={`p-4 rounded-2xl border space-y-2 ${isDark ? 'bg-slate-950/60 border-slate-800' : 'bg-white border-slate-200'}`}>
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-bold flex items-center gap-1.5">
-                <Activity className="w-4 h-4 text-blue-400" />
-                <span className={isDark ? 'text-slate-300' : 'text-slate-700'}>Equilibrio Biológico InBody</span>
-              </span>
-              <span
-                className={`font-black text-xs ${
-                  estadoColor === 'emerald' ? 'text-emerald-400' : estadoColor === 'rose' ? 'text-rose-400' : 'text-amber-400'
-                }`}
-              >
-                {esMasJoven
-                  ? `${Math.abs(diferencia)} años de ventaja biológica`
-                  : diferencia > 0
-                    ? `${diferencia} años de desgaste metabólico`
-                    : 'Estado balanceado'}
-              </span>
-            </div>
-
-            <div className="w-full h-3.5 bg-slate-800/80 rounded-full overflow-hidden p-0.5 relative">
+          <div className="bg-indigo-500/5 border border-indigo-500/20 p-4 rounded-2xl">
+            <h4 className="text-xs font-black text-indigo-400 uppercase tracking-widest mb-2">
+              Equilibrio Biológico InBody
+            </h4>
+            <div className={`w-full h-2 rounded-full overflow-hidden ${isDark ? 'bg-slate-800' : 'bg-slate-200'}`}>
               <div
-                className={`h-full rounded-full transition-all duration-1000 ${
-                  estadoColor === 'emerald'
-                    ? 'bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400'
-                    : estadoColor === 'rose'
-                      ? 'bg-gradient-to-r from-rose-600 via-rose-500 to-orange-500'
-                      : 'bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-400'
+                className={`h-full rounded-full ${
+                  diferencia > 2 ? 'bg-red-500' : diferencia < -1 ? 'bg-emerald-500' : 'bg-amber-500'
                 }`}
                 style={{ width: `${Math.min(100, Math.max(15, 100 - diferencia * 8))}%` }}
               />
             </div>
-
-            <p className={`hidden md:block text-xs leading-relaxed italic pt-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-              "{estadoMensaje}"
-            </p>
+            <p className={`text-[11px] mt-2 italic ${mutedCls}`}>{estadoMensaje}</p>
           </div>
+
+          <button
+            type="button"
+            onClick={() => setSimOpen((v) => !v)}
+            className={`w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider cursor-pointer border ${
+              simOpen
+                ? 'bg-slate-800 border-cyan-500/40 text-cyan-300'
+                : 'bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white shadow-md shadow-cyan-500/20 border-cyan-400/30'
+            }`}
+          >
+            🎛️ Simular cómo bajar mi Edad Corporal
+          </button>
         </div>
 
-        {/* Solo 3 factores */}
-        <div className={`lg:col-span-5 p-5 rounded-2xl border space-y-3.5 ${isDark ? 'bg-slate-950/80 border-slate-800' : 'bg-white border-slate-200 shadow-md'}`}>
-          <div className="flex items-center justify-between border-b pb-2 border-slate-800/80">
-            <span className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-              <Award className="w-3.5 h-3.5 text-blue-400" />
-              <span>Factores Determinantes</span>
+        {/* LADO DERECHO: FACTORES + SIMULADOR APARTE */}
+        <div className="flex flex-col gap-4">
+          <div className="space-y-2">
+          <h4 className={`text-[10px] font-black uppercase tracking-widest mb-2 border-b pb-1.5 ${mutedCls} ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+            Factores Determinantes (InBody 270S)
+          </h4>
+
+          <div className={`${factorCls} p-2.5 rounded-xl border flex items-center justify-between gap-3`}>
+            <div className="min-w-0">
+              <span className={`text-[10px] font-bold uppercase ${mutedCls}`}>Músculo SMM</span>
+              <div className={`text-sm font-black ${valueCls}`}>
+                {medicion.musculoKg.toFixed(1)} kg · {pctSmm.toFixed(1)}%
+              </div>
+            </div>
+            <span
+              className={`shrink-0 text-[11px] font-black px-2.5 py-1 rounded-lg border ${
+                deltas.musculo > 0
+                  ? 'bg-red-500/15 text-red-400 border-red-500/30'
+                  : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+              }`}
+            >
+              {badgeMusculo}
             </span>
-            <span className="text-[10px] font-bold text-cyan-400">Algoritmo InBody</span>
           </div>
 
-          <div className="grid grid-cols-1 gap-3">
-            <div className={`p-3 rounded-xl border ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
-              <div className="flex items-center gap-1.5 text-blue-400 text-xs font-bold">
-                <Dumbbell className="w-3.5 h-3.5" />
-                <span>Músculo SMM</span>
+          <div className={`${factorCls} p-2.5 rounded-xl border flex items-center justify-between gap-3`}>
+            <div className="min-w-0">
+              <span className={`text-[10px] font-bold uppercase ${mutedCls}`}>% Grasa</span>
+              <div className={`text-sm font-black ${valueCls}`}>
+                {medicion.pctGrasa.toFixed(1)}%
               </div>
-              <div className={`text-base font-black font-mono mt-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                {medicion.musculoKg.toFixed(1)} <span className="text-[11px] font-normal text-slate-400">kg</span>
-              </div>
-              <span className="text-[10px] text-emerald-400 font-bold block">
-                {medicion.musculoKg >= medicion.rangoSmmMin ? 'Preserva juventud' : 'Aumentar fuerza'}
-              </span>
             </div>
+            <span
+              className={`shrink-0 text-[11px] font-black px-2.5 py-1 rounded-lg border ${
+                deltas.grasa > 0
+                  ? 'bg-red-500/15 text-red-400 border-red-500/30'
+                  : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+              }`}
+            >
+              {badgeGrasa}
+            </span>
+          </div>
 
-            <div className={`p-3 rounded-xl border ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
-              <div className="flex items-center gap-1.5 text-rose-400 text-xs font-bold">
-                <Flame className="w-3.5 h-3.5" />
-                <span>% Grasa</span>
-              </div>
-              <div className={`text-base font-black font-mono mt-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                {medicion.pctGrasa.toFixed(1)} <span className="text-[11px] font-normal text-slate-400">%</span>
-              </div>
-              <span className="text-[10px] font-bold block">
-                {medicion.pctGrasa < 18 ? 'Magro atlético' : medicion.pctGrasa <= 24 ? 'Controlado' : 'Envejece tejidos'}
-              </span>
-            </div>
-
-            <div className={`p-3 rounded-xl border ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
-              <div className="flex items-center gap-1.5 text-indigo-400 text-xs font-bold">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>Grasa Visceral</span>
-              </div>
-              <div className={`text-base font-black font-mono mt-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+          <div className={`${factorCls} p-2.5 rounded-xl border flex items-center justify-between gap-3`}>
+            <div className="min-w-0">
+              <span className={`text-[10px] font-bold uppercase ${mutedCls}`}>Grasa Visceral</span>
+              <div className={`text-sm font-black ${valueCls}`}>
                 Nivel {medicion.grasaVisceral}
               </div>
-              <span className="text-[10px] font-bold block">
-                {medicion.grasaVisceral <= 5 ? 'Óptimo' : medicion.grasaVisceral <= 9 ? 'Moderado' : 'Riesgo alto'}
-              </span>
             </div>
+            <span
+              className={`shrink-0 text-[11px] font-black px-2.5 py-1 rounded-lg border ${
+                deltas.visceral > 0
+                  ? 'bg-red-500/15 text-red-400 border-red-500/30'
+                  : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+              }`}
+            >
+              {badgeVisceral}
+            </span>
           </div>
 
-          {analisis.alertasSarcopenia.length > 0 && (
-            <div className={`mt-3 p-3 rounded-xl border space-y-1.5 ${
-              isDark ? 'bg-amber-500/10 border-amber-500/30' : 'bg-amber-50 border-amber-200'
-            }`}>
-              <div className="flex items-center gap-1.5 text-amber-400 text-[10px] font-black uppercase tracking-wider">
-                <AlertTriangle className="w-3.5 h-3.5" />
-                Segmental / sarcopenia
-              </div>
-              {analisis.alertasSarcopenia.map((a, i) => (
-                <p key={i} className={`text-[10px] leading-snug ${isDark ? 'text-amber-100/90' : 'text-amber-900'}`}>
-                  • {a}
+          <div className={`p-2.5 rounded-xl flex items-center justify-between ${
+            isDark ? 'bg-indigo-500/10 border border-indigo-500/20' : 'bg-slate-900'
+          }`}>
+            <div className="flex items-center gap-2">
+              <Zap className="w-4 h-4 text-indigo-400" />
+              <span className="text-[10px] font-black text-indigo-300 uppercase tracking-widest">
+                InBody Score / Nivel
+              </span>
+            </div>
+            <div className="text-right">
+              <span className="text-sm font-black text-white">{medicion.inbodyScore} / 100</span>
+              <span className={`ml-2 text-[10px] font-bold uppercase ${nivelColor}`}>{nivelTexto}</span>
+            </div>
+          </div>
+          </div>
+
+          {simOpen && (
+            <div className={`rounded-2xl border p-3.5 space-y-3 ${simCls}`}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[10px] font-black uppercase tracking-wider text-cyan-400">
+                  ¿Qué pasa si bajo grasa / subo músculo?
                 </p>
-              ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBajarGrasa(0);
+                    setSubirMusculo(0);
+                  }}
+                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider border cursor-pointer ${
+                    isDark
+                      ? 'border-slate-700 text-slate-300 hover:bg-slate-800'
+                      : 'border-slate-300 text-slate-600 hover:bg-slate-200/70'
+                  }`}
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  Restablecer
+                </button>
+              </div>
+
+              <label className="block">
+                <div className="flex justify-between text-[11px] font-bold mb-1">
+                  <span className={isDark ? 'text-slate-300' : 'text-slate-700'}>Bajar Grasa Corporal</span>
+                  <span className="font-mono text-rose-400">{bajarGrasa.toFixed(1)} kg</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={12}
+                  step={0.5}
+                  value={bajarGrasa}
+                  onChange={(e) => setBajarGrasa(Number(e.target.value))}
+                  className="w-full accent-rose-500 cursor-pointer"
+                />
+                <span className={`text-[10px] font-bold ${mutedCls}`}>0 a 12 kg</span>
+              </label>
+              <label className="block">
+                <div className="flex justify-between text-[11px] font-bold mb-1">
+                  <span className={isDark ? 'text-slate-300' : 'text-slate-700'}>Ganar Músculo SMM</span>
+                  <span className="font-mono text-blue-400">{subirMusculo.toFixed(1)} kg</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={6}
+                  step={0.5}
+                  value={subirMusculo}
+                  onChange={(e) => setSubirMusculo(Number(e.target.value))}
+                  className="w-full accent-blue-500 cursor-pointer"
+                />
+                <span className={`text-[10px] font-bold ${mutedCls}`}>0 a 6 kg</span>
+              </label>
+
+              <div className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-3 py-2.5">
+                <span className="text-[10px] font-black uppercase tracking-wider text-cyan-400 block">
+                  Edad Corporal proyectada
+                </span>
+                <div className={`mt-0.5 text-xl font-black ${valueCls}`}>
+                  {analisisSim.edadCorporal}{' '}
+                  <span className={`text-sm font-medium ${mutedCls}`}>años</span>
+                </div>
+                <p className={`text-[11px] font-bold mt-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                  de {edadCorp} años pasa en vivo a {analisisSim.edadCorporal} años
+                  {deltaSim < 0
+                    ? ` · ${deltaSim} años más joven`
+                    : deltaSim > 0
+                      ? ` · +${deltaSim} años`
+                      : ' · sin cambio'}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-3 py-2.5 flex items-center gap-3">
+                <img
+                  src={`/medallas/n${nivelSim}.png`}
+                  alt={`Medalla ${nivelMedallaLabel(nivelSim)}`}
+                  className="w-12 h-12 object-contain drop-shadow-lg"
+                />
+                <div className="min-w-0">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-indigo-400 block">
+                    InBody Score / Medalla
+                  </span>
+                  <div className={`text-lg font-black ${valueCls}`}>
+                    {scoreSimulado} <span className={`text-sm ${mutedCls}`}>/ 100</span>
+                  </div>
+                  <p className={`text-[11px] font-bold truncate ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                    {nivelMedallaLabel(nivelSim)} · {analisisSim.tipoCuerpo}
+                  </p>
+                  {simActiva && (
+                    <p className="text-[10px] text-cyan-400 font-black uppercase tracking-wider mt-0.5">
+                      Somatotipo proyectado
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </div>

@@ -9,6 +9,8 @@ import {
   MealData,
   MealId,
 } from '../data/foodDatabase';
+import { mealDataDesdeIds } from '../data/menusRanchoEcuador';
+import { WorkoutCompletadoHoy } from '../utils/localPersistence';
 import {
   ActivityMode,
   getTodayLabel,
@@ -32,6 +34,7 @@ import {
   UtensilsCrossed,
   Apple,
   Salad,
+  Zap,
 } from 'lucide-react';
 
 interface CalculadoraCaloricaProps {
@@ -42,6 +45,9 @@ interface CalculadoraCaloricaProps {
   alimentos?: FoodItem[];
   /** Si true, oculta el botón regresar (cuando está embebido). */
   embedded?: boolean;
+  workoutHoy?: WorkoutCompletadoHoy | null;
+  menuRanchoIds?: Record<MealId, string[]>;
+  children?: React.ReactNode;
 }
 
 const MEAL_UI: Record<
@@ -107,6 +113,13 @@ function mealMacroShares(meals: MealData, id: MealId): Record<FoodCategory, numb
   return shares;
 }
 
+function carboPorciones(meals: MealData, id: MealId): number {
+  return Object.values(meals[id]).reduce(
+    (n, item) => n + (item.category === 'carbo' ? item.qty : 0),
+    0
+  );
+}
+
 function hasGoodBalance(shares: Record<FoodCategory, number>, total: number): boolean {
   if (total < 80) return false;
   return shares.proteina / total >= 0.15 || shares.verdura / total >= 0.08;
@@ -161,6 +174,9 @@ export const CalculadoraCalorica: React.FC<CalculadoraCaloricaProps> = ({
   onClose,
   alimentos,
   embedded = false,
+  workoutHoy = null,
+  menuRanchoIds,
+  children,
 }) => {
   const { isDark } = useTheme();
   const catalog = alimentos && alimentos.length > 0 ? alimentos : FOOD_DATABASE;
@@ -191,14 +207,18 @@ export const CalculadoraCalorica: React.FC<CalculadoraCaloricaProps> = ({
       setLoading(true);
       const stored = await loadDailyMeals(cedula);
       if (cancelled) return;
-      setMode(stored.mode);
+      const nextMode: ActivityMode | null = workoutHoy ? 'con_deporte' : stored.mode;
+      setMode(nextMode);
       setMeals(stored.meals);
+      if (workoutHoy && stored.mode !== 'con_deporte') {
+        await saveDailyMeals(cedula, { date: '', mode: 'con_deporte', meals: stored.meals });
+      }
       setLoading(false);
     })();
     return () => {
       cancelled = true;
     };
-  }, [cedula]);
+  }, [cedula, workoutHoy]);
 
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
@@ -274,6 +294,15 @@ export const CalculadoraCalorica: React.FC<CalculadoraCaloricaProps> = ({
     const empty = EMPTY_MEAL_DATA();
     setMeals(empty);
     await persist(empty, mode);
+  };
+
+  const autocompletarRancho = () => {
+    if (!menuRanchoIds) return;
+    const next = mealDataDesdeIds(menuRanchoIds, catalog);
+    setMeals(next);
+    const nextMode: ActivityMode = mode || (workoutHoy ? 'con_deporte' : 'sin_deporte');
+    if (!mode) setMode(nextMode);
+    void persist(next, nextMode);
   };
 
   const filtered = (mealId: MealId) => {
@@ -379,6 +408,7 @@ export const CalculadoraCalorica: React.FC<CalculadoraCaloricaProps> = ({
             />
           </button>
         </div>
+        {children}
       </div>
     );
   }
@@ -396,6 +426,11 @@ export const CalculadoraCalorica: React.FC<CalculadoraCaloricaProps> = ({
           <h3 className={`text-lg sm:text-xl font-black mt-1 truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
             {mode === 'sin_deporte' ? 'Día sin deporte (TMB)' : 'Día con deporte (Ingesta)'}
           </h3>
+          {workoutHoy && (
+            <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-black text-orange-300 bg-orange-500/15 border border-orange-500/30 px-2.5 py-1 rounded-full">
+              🔥 Entrenamiento registrado hoy (+{workoutHoy.caloriasQuemadas} kcal)
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
           <ModeBadges compact />
@@ -413,6 +448,8 @@ export const CalculadoraCalorica: React.FC<CalculadoraCaloricaProps> = ({
           )}
         </div>
       </div>
+
+      {children}
 
       {/* Meta */}
       <div className={`rounded-2xl border p-4 space-y-3 ${subShell}`}>
@@ -474,6 +511,17 @@ export const CalculadoraCalorica: React.FC<CalculadoraCaloricaProps> = ({
         </div>
       )}
 
+      {menuRanchoIds && (
+        <button
+          type="button"
+          onClick={autocompletarRancho}
+          className="w-full py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-amber-500/20"
+        >
+          <Zap className="w-4 h-4" />
+          Autocompletar con el Menú del Rancho de Hoy
+        </button>
+      )}
+
       {/* Comidas */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {MEAL_SECTIONS.map((section) => {
@@ -487,6 +535,7 @@ export const CalculadoraCalorica: React.FC<CalculadoraCaloricaProps> = ({
           const shareSum = Object.values(shares).reduce((a, b) => a + b, 0) || 1;
           const balanced = hasGoodBalance(shares, mTotal);
           const isOpen = activeDropdown === section.id;
+          const nCarbos = carboPorciones(meals, section.id);
 
           return (
             <div
@@ -628,6 +677,11 @@ export const CalculadoraCalorica: React.FC<CalculadoraCaloricaProps> = ({
                   })
                 )}
               </div>
+              {nCarbos >= 3 && (
+                <p className="text-[11px] leading-relaxed text-amber-700 dark:text-amber-200 bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2">
+                  En esta comida hay {nCarbos} porciones de carbohidrato (arroz, pan, maduro, yuca…). Elige solo 1 o 2 fuentes según tu meta calórica.
+                </p>
+              )}
             </div>
           );
         })}

@@ -184,12 +184,32 @@ export interface PlanEntrenamiento {
   videoUrl?: string;
   /** URL de YouTube para audio de fondo (iframe oculto) */
   musicaFondoUrl?: string;
+  /** Lista de links de YouTube / Shorts motivacionales */
+  videosMotivacionalesUrls?: string[];
   descripcion: string;
   enfoque?: string;
   diasPorSemana?: number;
   ejerciciosClave?: string[];
+  rutinaInteractiva?: BloqueEjercicioPlan[];
+  duracionEstimadaMin?: number;
   fechaCreacion?: string;
   autor?: string;
+}
+
+/** Ejercicio colocado en una rutina (constructor visual de Entrenador/Admin). */
+export interface BloqueEjercicioPlan {
+  uid: string;
+  ejercicioId: string; // ej. "0001" o id custom
+  nombre_es: string;
+  grupo_muscular: string;
+  equipo: string;
+  animacion: string;
+  modo: 'tiempo' | 'repeticiones';
+  series: number;
+  duracionSeg: number; // ej. 45s
+  repeticiones: number; // ej. 20 reps
+  descansoSeg: number; // ej. 20s
+  instruccionCorta?: string;
 }
 
 /** Catálogo editable de fichas etarias (tarjetas reutilizables) */

@@ -54,6 +54,10 @@ service cloud.firestore {
       allow read: if signedIn();
       allow write: if isAdmin() || isEntrenador();
     }
+    match /ejerciciosCustom/{id} {
+      allow read: if signedIn();
+      allow write: if isAdmin() || isEntrenador();
+    }
     match /alimentosCalculadora/{id} {
       allow read: if signedIn();
       allow write: if isAdmin() || isNutricionista();

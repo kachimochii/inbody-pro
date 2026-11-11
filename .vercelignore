@@ -11,3 +11,11 @@ PLAN1.jpeg
 dist
 *.log
 node_modules
+# Fuentes de extracción (los WebP finales viven en public/ejercicios-webp/)
+ejercicios_extraidos/
+_apk_inspect/
+inspeccion_extraidos/
+123.apk
+*.pptx
+*.docx
+ESFORSFT AGOSTO 2026.xlsx

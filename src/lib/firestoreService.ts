@@ -796,26 +796,40 @@ export async function seedPlanesIfEmpty(
     }
   }
 
-  if (nutri.length === 0 && seedNutri.length > 0) {
-    const batch = writeBatch(db);
-    seedNutri.forEach((p) => {
-      const { id, ...rest } = p;
-      batch.set(doc(db, COL_PLANES_NUTRI, id), rest);
-    });
-    await batch.commit();
-    nutri = seedNutri;
-  } else if (seedNutri.length > 0) {
-    const existing = new Set(nutri.map((p) => p.id));
-    const missingN = seedNutri.filter((p) => !existing.has(p.id));
-    if (missingN.length > 0) {
+  const seedNutriIds = new Set(seedNutri.map((p) => p.id));
+  const obsoleteNutri = nutri.filter((p) => {
+    if (seedNutriIds.has(p.id)) return false;
+    const nombre = String(p.nombre || '');
+    if (
+      /hipertrofia de altura|men[uú] andino|vegetales hidrop|recomposici[oó]n|quinoa t[aá]ctica|lentejas y ternera|batido de|protocolo de hipertrofia/i.test(
+        nombre
+      )
+    ) {
+      return true;
+    }
+    return /^(nutri-sierra-|nutri-costa-|nutri-oriente-|nutri-galapagos-|plan-nutri-)/i.test(p.id);
+  });
+  if (obsoleteNutri.length > 0) {
+    const chunk = 400;
+    for (let i = 0; i < obsoleteNutri.length; i += chunk) {
       const batch = writeBatch(db);
-      missingN.forEach((p) => {
-        const { id, ...rest } = p;
-        batch.set(doc(db, COL_PLANES_NUTRI, id), rest, { merge: true });
+      obsoleteNutri.slice(i, i + chunk).forEach((p) => {
+        batch.delete(doc(db, COL_PLANES_NUTRI, p.id));
       });
       await batch.commit();
-      nutri = [...nutri, ...missingN];
     }
+  }
+  if (seedNutri.length > 0) {
+    const chunk = 400;
+    for (let i = 0; i < seedNutri.length; i += chunk) {
+      const batch = writeBatch(db);
+      seedNutri.slice(i, i + chunk).forEach((p) => {
+        const { id, ...rest } = p;
+        batch.set(doc(db, COL_PLANES_NUTRI, id), rest);
+      });
+      await batch.commit();
+    }
+    nutri = await fetchPlanesNutricion();
   }
 
   return { planes, fichas, nutri };

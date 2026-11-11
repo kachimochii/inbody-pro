@@ -5,7 +5,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { UserAccount, UserRole, InBodyRecord, PlanNutricion, PlanEntrenamiento, FichaEdadCatalogo } from './types/inbody';
-import { MOCK_USUARIOS, MOCK_PLANES_NUTRICION, MOCK_PLANES_ENTRENAMIENTO } from './data/mockData';
+import { MOCK_USUARIOS, MOCK_PLANES_NUTRICION, MOCK_PLANES_ENTRENAMIENTO, esPlanNutricionObsoleto } from './data/mockData';
 import { FOOD_DATABASE, FoodItem } from './data/foodDatabase';
 import { DEFAULT_FICHAS_EDAD } from './utils/localPersistence';
 import {
@@ -181,7 +181,11 @@ function MainAppContent() {
         planes.forEach((p) => byId.set(p.id, p));
         setPlanesEntrenamiento(Array.from(byId.values()));
         setFichasEdad(fichas.length ? fichas : DEFAULT_FICHAS_EDAD);
-        setPlanesNutricion(nutri.length ? nutri : MOCK_PLANES_NUTRICION);
+        const nutriLimpios = nutri.filter((p) => !esPlanNutricionObsoleto(p));
+        const nutriById = new Map<string, PlanNutricion>();
+        MOCK_PLANES_NUTRICION.forEach((p) => nutriById.set(p.id, p));
+        nutriLimpios.forEach((p) => nutriById.set(p.id, p));
+        setPlanesNutricion(Array.from(nutriById.values()));
         setAlimentosCalculadora(alimentos.length ? alimentos : FOOD_DATABASE);
         setCloudReady(true);
         setCloudError(null);
@@ -657,6 +661,10 @@ function MainAppContent() {
                 planesNutricion={planesNutricion}
                 planesEntrenamiento={planesEntrenamiento}
                 alimentosCalculadora={alimentosCalculadora}
+                scoresUnidad={users
+                  .filter((u) => u.unidadActual && u.unidadActual === inspectingUser.unidadActual)
+                  .map((u) => u.mediciones[0]?.inbodyScore)
+                  .filter((n): n is number => typeof n === 'number' && n > 0)}
               />
             </div>
           ) : (
@@ -715,6 +723,10 @@ function MainAppContent() {
             planesEntrenamiento={planesEntrenamiento}
             alimentosCalculadora={alimentosCalculadora}
             canManagePin
+            scoresUnidad={users
+              .filter((u) => currentUser?.unidadActual && u.unidadActual === currentUser.unidadActual)
+              .map((u) => u.mediciones[0]?.inbodyScore)
+              .filter((n): n is number => typeof n === 'number' && n > 0)}
           />
         )}
 

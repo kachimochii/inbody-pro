@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { SomatotipoTipo, RegionEcuador, PlanNutricion } from '../../types/inbody';
 import { DEFINICIONES_SOMATOTIPOS, GALERIA_PLATOS_ECUADOR } from '../../data/mockData';
 import { FoodItem } from '../../data/foodDatabase';
 import { AlimentosCalculadoraManager } from '../AlimentosCalculadoraManager';
 import { BaremosEdadCorporalManager } from '../BaremosEdadCorporalManager';
+import { uploadImageToStorage } from '../../lib/firestoreService';
+import { readImageAsDataUrl } from '../../utils/localPersistence';
 import { 
   Salad, 
   Plus, 
@@ -18,7 +20,8 @@ import {
   Sparkles,
   Copy,
   Calculator,
-  Activity
+  Activity,
+  Upload
 } from 'lucide-react';
 
 interface NutricionistaDashboardProps {
@@ -63,6 +66,9 @@ export const NutricionistaDashboard: React.FC<NutricionistaDashboardProps> = ({
   const [formCarbos, setFormCarbos] = useState(210);
   const [formGrasas, setFormGrasas] = useState(55);
   const [formAlimentos, setFormAlimentos] = useState('');
+  const [uploadError, setUploadError] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const fotoInputRef = useRef<HTMLInputElement>(null);
 
   const [notification, setNotification] = useState<string | null>(null);
 
@@ -83,6 +89,7 @@ export const NutricionistaDashboard: React.FC<NutricionistaDashboardProps> = ({
     setFormCarbos(210);
     setFormGrasas(55);
     setFormAlimentos('');
+    setUploadError('');
     setIsModalOpen(true);
   };
 
@@ -98,7 +105,33 @@ export const NutricionistaDashboard: React.FC<NutricionistaDashboardProps> = ({
     setFormCarbos(plan.carbosG || 210);
     setFormGrasas(plan.grasasG || 55);
     setFormAlimentos(plan.alimentosRecomendados ? plan.alimentosRecomendados.join(', ') : '');
+    setUploadError('');
     setIsModalOpen(true);
+  };
+
+  const handleFotoUpload = async (file: File | null) => {
+    if (!file) return;
+    setUploadError('');
+    setUploading(true);
+    try {
+      if (!file.type.startsWith('image/') && !/\.(jpe?g|png|webp|gif)$/i.test(file.name)) {
+        throw new Error('Seleccione una foto (JPG, PNG o WEBP).');
+      }
+      const url = await uploadImageToStorage(file, 'nutricion');
+      setFormImagenUrl(url);
+      showNotify(`Foto en la nube: ${file.name}`);
+    } catch (cloudErr) {
+      const message = cloudErr instanceof Error ? cloudErr.message : 'No se pudo subir a Storage.';
+      setUploadError(message);
+      try {
+        setFormImagenUrl(await readImageAsDataUrl(file));
+        showNotify('Vista previa local. Suba de nuevo cuando Storage esté activo.');
+      } catch {
+        /* ignore */
+      }
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleSavePlan = (e: React.FormEvent) => {
@@ -557,11 +590,29 @@ export const NutricionistaDashboard: React.FC<NutricionistaDashboardProps> = ({
                 <div className="flex gap-2">
                   <input
                     type="url"
-                    value={formImagenUrl}
+                    value={formImagenUrl.startsWith('data:') ? '' : formImagenUrl}
                     onChange={(e) => setFormImagenUrl(e.target.value)}
-                    placeholder="https://images.unsplash.com/..."
+                    placeholder="https://... o elija galería / suba foto"
                     className="flex-1 px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white outline-none focus:border-emerald-500"
-                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fotoInputRef.current?.click()}
+                    disabled={uploading}
+                    className="px-3 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-[10px] font-black uppercase tracking-wider cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    {uploading ? 'Subiendo…' : 'Foto PC'}
+                  </button>
+                  <input
+                    ref={fotoInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    className="hidden"
+                    onChange={(e) => {
+                      void handleFotoUpload(e.target.files?.[0] || null);
+                      e.target.value = '';
+                    }}
                   />
                   {formImagenUrl && (
                     <img
@@ -571,13 +622,13 @@ export const NutricionistaDashboard: React.FC<NutricionistaDashboardProps> = ({
                     />
                   )}
                 </div>
+                {uploadError && <p className="text-[11px] text-rose-400 mt-1">{uploadError}</p>}
 
-                {/* Galería rápida de platos ecuatorianos */}
                 <div className="mt-2.5">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
-                    Platos Típicos Ecuatorianos Disponibles:
+                    Galería ecuatoriana (1 clic):
                   </span>
-                  <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-48 overflow-y-auto pr-1">
                     {GALERIA_PLATOS_ECUADOR.map((pl, i) => (
                       <button
                         key={i}
@@ -587,15 +638,15 @@ export const NutricionistaDashboard: React.FC<NutricionistaDashboardProps> = ({
                           if (!formNombre) setFormNombre(pl.nombre);
                           setFormRegion(pl.region as RegionEcuador);
                         }}
-                        className={`shrink-0 flex items-center gap-1.5 p-1 rounded-xl border transition-all cursor-pointer ${
+                        className={`text-left rounded-xl border overflow-hidden cursor-pointer ${
                           formImagenUrl === pl.url
-                            ? 'border-emerald-500 bg-emerald-500/20 ring-1 ring-emerald-500'
-                            : 'border-slate-800 bg-slate-950 hover:border-slate-700'
+                            ? 'border-emerald-500 ring-1 ring-emerald-500'
+                            : 'border-slate-800 hover:border-slate-600'
                         }`}
                       >
-                        <img src={pl.url} alt={pl.nombre} className="w-8 h-8 rounded-lg object-cover" />
-                        <div className="text-left pr-2">
-                          <span className="text-[10px] font-bold text-slate-200 block truncate max-w-[120px]">{pl.nombre}</span>
+                        <img src={pl.url} alt={pl.nombre} className="w-full h-16 object-cover" />
+                        <div className="px-2 py-1 bg-slate-950">
+                          <span className="text-[10px] font-bold text-slate-200 block truncate">{pl.nombre}</span>
                           <span className="text-[9px] text-emerald-400 font-semibold">{pl.region}</span>
                         </div>
                       </button>

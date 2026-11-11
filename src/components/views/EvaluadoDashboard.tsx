@@ -1,18 +1,35 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { UserAccount, SomatotipoDefinicion, SomatotipoTipo, PlanNutricion, PlanEntrenamiento, RegionEcuador } from '../../types/inbody';
+import { UserAccount, SomatotipoDefinicion, SomatotipoTipo, PlanNutricion, PlanEntrenamiento, RegionEcuador, BloqueEjercicioPlan } from '../../types/inbody';
 import { 
   DEFINICIONES_SOMATOTIPOS, 
   CAPAS_BASE, 
   MAPEO_SOMATOTIPOS, 
+  MOCK_USUARIOS,
   MOCK_PLANES_NUTRICION, 
   MOCK_PLANES_ENTRENAMIENTO,
-  FRASES_MANDO
+  FRASES_MANDO,
+  VIDEOS_MOTIVACIONALES_BASE,
+  familiaNutricion,
+  textoPorcionesRancho,
+  ajustePorcionRancho,
 } from '../../data/mockData';
+import { menuRanchoPorDia } from '../../data/menusRanchoEcuador';
+import { WorkoutPlayerModal } from '../WorkoutPlayerModal';
+import { MotivacionVideoPopup } from '../MotivacionVideoPopup';
+import { cargarRutinaDelDia } from '../../utils/rutinaInteractiva';
+import {
+  loadWorkoutCompletadoHoy,
+  saveWorkoutCompletadoHoy,
+  siguienteVideoMotivacional,
+  markVideoMotivacionVisto,
+  type WorkoutCompletadoHoy,
+} from '../../utils/localPersistence';
 import {
   calculateAge,
   calculateTimeInService,
   esCumpleanos, 
   extractYoutubeVideoId,
+  fechaHoyEcuador,
   resolveTipoCuerpo,
 } from '../../utils/inbodyCalculations';
 import {
@@ -24,6 +41,7 @@ import {
 import { SomatotipoModal } from '../SomatotipoModal';
 import { GuiaInbodyModal } from '../GuiaInbodyModal';
 import { EdadCorporalCard } from '../EdadCorporalCard';
+import { CarneInbodyModal } from '../CarneInbodyModal';
 import { CambiarPinModal } from '../CambiarPinModal';
 import {
   buildDeltasHistorial,
@@ -78,6 +96,8 @@ import {
   Music,
   Star,
   Cake,
+  RefreshCw,
+  Trophy,
 } from 'lucide-react';
 
 interface EvaluadoDashboardProps {
@@ -88,6 +108,32 @@ interface EvaluadoDashboardProps {
   alimentosCalculadora?: FoodItem[];
   /** Solo el evaluado dueño de la ficha (no el admin inspeccionando). */
   canManagePin?: boolean;
+  /** Scores InBody de compañeros de la misma unidad (si el roster está cargado). */
+  scoresUnidad?: number[];
+}
+
+function calcularPosicionUnidad(score: number, unidad: string, extraScores: number[] = []) {
+  const mockScores = MOCK_USUARIOS
+    .filter((u) => u.unidadActual && u.unidadActual === unidad)
+    .map((u) => u.mediciones[0]?.inbodyScore)
+    .filter((n): n is number => typeof n === 'number' && n > 0);
+  const peers = [...extraScores, ...mockScores, score].filter(
+    (n) => Number.isFinite(n) && n >= 0
+  );
+  const n = peers.length;
+  if (n < 3) {
+    const topPct = Math.max(1, Math.min(99, 101 - Math.round(score)));
+    const ptsElite = Math.max(0, 90 - Math.round(score));
+    return { topPct, ptsElite, enElite: score >= 90, n };
+  }
+  const rank = peers.filter((s) => s > score).length + 1;
+  const topPct = Math.max(1, Math.min(99, Math.round((rank / n) * 100)));
+  const sorted = [...peers].sort((a, b) => b - a);
+  const eliteCount = Math.max(1, Math.ceil(n * 0.1));
+  const eliteCutoff = sorted[eliteCount - 1] ?? 90;
+  const ptsElite = Math.max(0, Math.ceil(eliteCutoff - score));
+  const enElite = rank <= eliteCount;
+  return { topPct, ptsElite, enElite, n };
 }
 
 export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({ 
@@ -97,6 +143,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
   planesEntrenamiento = MOCK_PLANES_ENTRENAMIENTO,
   alimentosCalculadora = FOOD_DATABASE,
   canManagePin = false,
+  scoresUnidad = [],
 }) => {
   const [modalSomatotipo, setModalSomatotipo] = useState<SomatotipoDefinicion | null>(null);
   const [modalGuiaAbierto, setModalGuiaAbierto] = useState(false);
@@ -110,8 +157,19 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
   const [sesionEntrenoIniciada, setSesionEntrenoIniciada] = useState(false);
   const [audioPlaying, setAudioPlaying] = useState(false);
   const [audioMuted, setAudioMuted] = useState(false);
+  const [playerAbierto, setPlayerAbierto] = useState(false);
+  const [circuitoPlan, setCircuitoPlan] = useState<BloqueEjercicioPlan[]>([]);
+  const [circuitoCargando, setCircuitoCargando] = useState(false);
+  const [enfoqueDia, setEnfoqueDia] = useState('');
+  const [varianteOffset, setVarianteOffset] = useState(0);
+  const [videoMotivacionUrl, setVideoMotivacionUrl] = useState<string | null>(null);
+  const [pendientePlayer, setPendientePlayer] = useState(false);
+  const [menuRanchoOffset, setMenuRanchoOffset] = useState(0);
+  const [platosCasaExpandido, setPlatosCasaExpandido] = useState(false);
+  const [workoutHoy, setWorkoutHoy] = useState<WorkoutCompletadoHoy | null>(null);
   const [matrizSomatotiposAbierta, setMatrizSomatotiposAbierta] = useState(false);
   const [modalPinAbierto, setModalPinAbierto] = useState(false);
+  const [modalCarneAbierto, setModalCarneAbierto] = useState(false);
   const [impactoValor, setImpactoValor] = useState(DEFAULT_CREDITOS.impactoValor);
   const [impactoTexto, setImpactoTexto] = useState(DEFAULT_CREDITOS.impactoTexto);
   const [frase1, setFrase1] = useState(DEFAULT_CREDITOS.frase1);
@@ -129,6 +187,44 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
   useEffect(() => {
     setMedIndex(0);
   }, [user.cedula, user.mediciones.length]);
+
+  useEffect(() => {
+    setWorkoutHoy(loadWorkoutCompletadoHoy(user.cedula));
+  }, [user.cedula]);
+
+  useEffect(() => {
+    if (!modalEntrenamientoAbierto) {
+      setCircuitoPlan([]);
+      return;
+    }
+    const plan =
+      planesEntrenamiento.find((p) => p.id === planEntrenoSeleccionadoId) ||
+      planesEntrenamiento[0];
+    if (!plan) {
+      setCircuitoPlan([]);
+      return;
+    }
+    let vivo = true;
+    setCircuitoCargando(true);
+    cargarRutinaDelDia(plan, fechaHoyEcuador(), user.cedula, varianteOffset)
+      .then((r) => {
+        if (!vivo) return;
+        setCircuitoPlan(r.bloques);
+        setEnfoqueDia(r.enfoqueDia);
+      })
+      .catch(() => {
+        if (vivo) {
+          setCircuitoPlan([]);
+          setEnfoqueDia('');
+        }
+      })
+      .finally(() => {
+        if (vivo) setCircuitoCargando(false);
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [modalEntrenamientoAbierto, planEntrenoSeleccionadoId, planesEntrenamiento, varianteOffset, user.cedula]);
 
   useEffect(() => {
     if (!esCumpleanos(user.fechaNacimiento)) {
@@ -317,6 +413,8 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
   const soldadoUrl = `/medallas/s${nivelNumero}.png`;
   const etiquetaMedallaNivel3 = badgeUser.etiqueta;
   const scoreBarPct = Math.min(100, Math.max(4, score));
+  const posicionUnidad = calcularPosicionUnidad(score, user.unidadActual || '', scoresUnidad);
+  const unidadPosicion = user.unidadActual || 'tu unidad';
 
   // Somatotipo actual y definición con selección de silueta según género
   const somatotipoActual = resolveTipoCuerpo(
@@ -406,24 +504,79 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
   else if (edad > 40) fichaEdadSugerida = 'Ficha 3 (41 a 50 años)';
   else if (edad > 30) fichaEdadSugerida = 'Ficha 2 (31 a 40 años)';
 
-  const planesNutricionUsuario = planesNutricion.filter(
-    (p) =>
-      p.region === selectedRegion &&
-      (String(p.somatotipo || '').trim().toLowerCase() ===
-        String(somatotipoActual || '').trim().toLowerCase() ||
-        p.somatotipo === 'Tipo estándar')
+  const diaMesActual = Number(fechaHoyEcuador().slice(8, 10)) || 1;
+  const menuRanchoVisible = menuRanchoPorDia(diaMesActual + menuRanchoOffset);
+  const porcionesHoy = textoPorcionesRancho(somatotipoActual);
+  const ajusteHoy = ajustePorcionRancho(somatotipoActual);
+
+  const familiaActual = familiaNutricion(somatotipoActual);
+  const planesFamilia = [...planesNutricion].filter(
+    (p) => familiaNutricion(p.somatotipo) === familiaActual
   );
+  const planesEnRegion = planesFamilia.filter((p) => p.region === selectedRegion);
+  const planesNutricionUsuario = (planesEnRegion.length ? planesEnRegion : planesFamilia).sort((a, b) => {
+      const exactA = String(a.somatotipo).trim().toLowerCase() === String(somatotipoActual).trim().toLowerCase();
+      const exactB = String(b.somatotipo).trim().toLowerCase() === String(somatotipoActual).trim().toLowerCase();
+      if (exactA !== exactB) return exactA ? -1 : 1;
+      const regA = a.region === selectedRegion;
+      const regB = b.region === selectedRegion;
+      if (regA !== regB) return regA ? -1 : 1;
+      return 0;
+    });
   const planNutricionPrincipal = planesNutricionUsuario[0] || planesNutricion[0];
+
+  const justificacionPlato = (plan: PlanNutricion) => {
+    const exacto =
+      String(plan.somatotipo).trim().toLowerCase() === String(somatotipoActual).trim().toLowerCase();
+    if (familiaActual === 'deficit') {
+      return exacto
+        ? `Exacto para ${somatotipoActual} en ${plan.region}: porciones caseras (cucharetas, presas) y sin fritura para bajar grasa sin perder músculo.`
+        : `Ajustado a somatotipos con exceso de grasa en ${plan.region} (incluye ${somatotipoActual}): proteína magra y carbos medidos de comida real ecuatoriana.`;
+    }
+    return exacto
+      ? `Exacto para ${somatotipoActual} en ${plan.region}: almuerzo completo de casa/rancho con arroz, menestra y presa para sostener masa muscular.`
+      : `Pensado para ganancia o mantenimiento muscular (${somatotipoActual}) con platos cotidianos de ${plan.region} y porciones completas.`;
+  };
 
   const planEntrenamientoPrincipal =
     planesEntrenamientoUsuario.find(p => p.id === planEntrenoSeleccionadoId) ||
     planesEntrenamientoUsuario[0] ||
     null;
 
+  const planModalActivo =
+    planesEntrenamientoUsuario.find((p) => p.id === planEntrenoSeleccionadoId) ||
+    planesEntrenamientoUsuario[0] ||
+    null;
+
+  const abrirPlayerEntrenamiento = () => {
+    if (!planModalActivo) return;
+    const urls = [
+      ...(planModalActivo.videosMotivacionalesUrls || []),
+      ...VIDEOS_MOTIVACIONALES_BASE,
+    ];
+    const siguiente = siguienteVideoMotivacional(user.cedula, urls);
+    if (siguiente) {
+      markVideoMotivacionVisto(user.cedula, siguiente);
+      setPendientePlayer(true);
+      setVideoMotivacionUrl(siguiente);
+      return;
+    }
+    setSesionEntrenoIniciada(true);
+    if (planModalActivo.musicaFondoUrl) setAudioPlaying(true);
+    setPlayerAbierto(true);
+  };
+
+  const cerrarPlayerEntrenamiento = () => {
+    setPlayerAbierto(false);
+    setAudioPlaying(false);
+    setSesionEntrenoIniciada(false);
+  };
+
   const cerrarModalEntrenamiento = () => {
     setModalEntrenamientoAbierto(false);
     setSesionEntrenoIniciada(false);
     setAudioPlaying(false);
+    setPlayerAbierto(false);
   };
 
   // Grasa visceral: BIEN o MAL
@@ -577,6 +730,20 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
                     Manual técnico
                   </span>
                   <span>Documento guía</span>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setModalCarneAbierto(true)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-[10px] uppercase tracking-wide transition-all shadow-md shadow-emerald-500/15 cursor-pointer border border-emerald-400/30"
+                title="Descargar carné táctico InBody para WhatsApp"
+              >
+                <span className="text-sm leading-none">📲</span>
+                <div className="text-left leading-tight">
+                  <span className="block text-[8px] text-emerald-100 font-normal normal-case tracking-normal">
+                    Historia WhatsApp
+                  </span>
+                  <span>Descargar Mi Carné InBody</span>
                 </div>
               </button>
             </div>
@@ -1246,91 +1413,121 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
 
           </div>
 
-          {/* LADO DERECHO: 30% (COL-SPAN-4) - SEMÁFORO DE 3 NIVELES CON RESUMEN E INDICADOR */}
-          <div className={`lg:col-span-4 ${subCardCls} border rounded-3xl p-5 sm:p-6 flex flex-col justify-between space-y-4`}>
-            
-            <div className={`border-b pb-2 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
-                Semáforo Institucional
-              </span>
-              <h3 className={`text-sm font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                Distribución de los 3 Niveles
-              </h3>
-            </div>
+          {/* LADO DERECHO: semáforo con textos + barrita de posición abajo */}
+          <div className="lg:col-span-4 flex flex-col gap-4">
+            <div className={`${subCardCls} border rounded-3xl p-5 sm:p-6 flex flex-col gap-3`}>
+              <div className={`border-b pb-2 text-center ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+                  Semáforo Institucional
+                </span>
+                <h3 className={`text-sm font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  Distribución de los 3 Niveles
+                </h3>
+              </div>
 
-            <div className="space-y-3">
-              
-              {/* NIVEL 3: ALTO (VERDE) */}
-              <div className={`p-3 rounded-2xl border transition-all ${
+              <div className={`p-3.5 rounded-2xl border transition-all ${
                 nivelNumero === 3
                   ? 'bg-emerald-500/15 border-emerald-500/60 shadow-lg shadow-emerald-500/10 ring-1 ring-emerald-500'
-                  : isDark ? 'bg-slate-900/60 border-slate-800 opacity-60' : 'bg-white border-slate-200 opacity-60'
+                  : isDark ? 'bg-slate-900/60 border-slate-800 opacity-70' : 'bg-white border-slate-200 opacity-70'
               }`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50" />
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-3 h-3 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50 shrink-0" />
                     <span className="text-xs font-black text-emerald-500">NIVEL 3 | ALTO</span>
                   </div>
-                  <span className="text-[10px] font-mono font-bold text-slate-400">85 - 100 pts</span>
+                  <span className="text-[10px] font-mono font-bold text-slate-400 shrink-0">85 - 100 pts</span>
                 </div>
-                <p className={`hidden md:block text-[11px] mt-1.5 leading-snug ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                <p className={`text-[11px] mt-1.5 leading-snug ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                   Nivel óptimo sobresaliente. Excelente equilibrio corporal, masa muscular sólida y máxima resistencia táctica.
                 </p>
                 {nivelNumero === 3 && (
-                  <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 text-[10px] font-black uppercase">
-                    <span>👉 ESTÁS EN ESTE NIVEL</span>
+                  <div className="mt-2 flex justify-center">
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 text-[10px] font-black uppercase">
+                      👉 ESTÁS EN ESTE NIVEL
+                    </span>
                   </div>
                 )}
               </div>
 
-              {/* NIVEL 2: MEDIO (AMARILLO / ÁMBAR) */}
-              <div className={`p-3 rounded-2xl border transition-all ${
+              <div className={`p-3.5 rounded-2xl border transition-all ${
                 nivelNumero === 2
                   ? 'bg-amber-500/15 border-amber-500/60 shadow-lg shadow-amber-500/10 ring-1 ring-amber-500'
-                  : isDark ? 'bg-slate-900/60 border-slate-800 opacity-60' : 'bg-white border-slate-200 opacity-60'
+                  : isDark ? 'bg-slate-900/60 border-slate-800 opacity-70' : 'bg-white border-slate-200 opacity-70'
               }`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full bg-amber-500 shadow-sm shadow-amber-500/50" />
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-3 h-3 rounded-full bg-amber-500 shadow-sm shadow-amber-500/50 shrink-0" />
                     <span className="text-xs font-black text-amber-500">NIVEL 2 | MEDIO</span>
                   </div>
-                  <span className="text-[10px] font-mono font-bold text-slate-400">70 - 84 pts</span>
+                  <span className="text-[10px] font-mono font-bold text-slate-400 shrink-0">70 - 84 pts</span>
                 </div>
-                <p className={`hidden md:block text-[11px] mt-1.5 leading-snug ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                <p className={`text-[11px] mt-1.5 leading-snug ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                   Nivel intermedio aceptable. Mantiene bases operativas con oportunidad de reducir grasa y tonificar masa muscular.
                 </p>
                 {nivelNumero === 2 && (
-                  <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-600 dark:text-amber-300 text-[10px] font-black uppercase">
-                    <span>👉 ESTÁS EN ESTE NIVEL</span>
+                  <div className="mt-2 flex justify-center">
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-600 dark:text-amber-300 text-[10px] font-black uppercase">
+                      👉 ESTÁS EN ESTE NIVEL
+                    </span>
                   </div>
                 )}
               </div>
 
-              {/* NIVEL 1: BAJO (ROJO) */}
-              <div className={`p-3 rounded-2xl border transition-all ${
+              <div className={`p-3.5 rounded-2xl border transition-all ${
                 nivelNumero === 1
                   ? 'bg-rose-500/15 border-rose-500/60 shadow-lg shadow-rose-500/10 ring-1 ring-rose-500'
-                  : isDark ? 'bg-slate-900/60 border-slate-800 opacity-60' : 'bg-white border-slate-200 opacity-60'
+                  : isDark ? 'bg-slate-900/60 border-slate-800 opacity-70' : 'bg-white border-slate-200 opacity-70'
               }`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full bg-rose-500 shadow-sm shadow-rose-500/50" />
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-3 h-3 rounded-full bg-rose-500 shadow-sm shadow-rose-500/50 shrink-0" />
                     <span className="text-xs font-black text-rose-500">NIVEL 1 | BAJO</span>
                   </div>
-                  <span className="text-[10px] font-mono font-bold text-slate-400">&lt; 70 pts</span>
+                  <span className="text-[10px] font-mono font-bold text-slate-400 shrink-0">&lt; 70 pts</span>
                 </div>
-                <p className={`hidden md:block text-[11px] mt-1.5 leading-snug ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                <p className={`text-[11px] mt-1.5 leading-snug ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                   Requiere atención y reacondicionamiento prioritario para recuperar estándares de salud y capacidad operativa.
                 </p>
                 {nivelNumero === 1 && (
-                  <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-rose-500/20 text-rose-600 dark:text-rose-300 text-[10px] font-black uppercase">
-                    <span>👉 ESTÁS EN ESTE NIVEL</span>
+                  <div className="mt-2 flex justify-center">
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-rose-500/20 text-rose-600 dark:text-rose-300 text-[10px] font-black uppercase">
+                      👉 ESTÁS EN ESTE NIVEL
+                    </span>
                   </div>
                 )}
               </div>
-
             </div>
 
+            <div className={`border rounded-2xl p-3.5 sm:p-4 ${
+              isDark ? 'bg-slate-950/80 border-amber-500/25' : 'bg-amber-50/70 border-amber-200'
+            }`}>
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Trophy className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span className={`text-[11px] font-black uppercase tracking-wider ${isDark ? 'text-amber-300' : 'text-amber-800'}`}>
+                    🏆 Tu Posición Operativa en {unidadPosicion}
+                  </span>
+                </div>
+                <span className={`text-xs font-black ${posicionUnidad.enElite ? 'text-emerald-400' : isDark ? 'text-white' : 'text-slate-900'}`}>
+                  Top {posicionUnidad.topPct}%
+                </span>
+              </div>
+              <div className={`h-2 rounded-full overflow-hidden ${isDark ? 'bg-slate-800' : 'bg-amber-100'}`}>
+                <div
+                  className={`h-full rounded-full ${
+                    posicionUnidad.enElite
+                      ? 'bg-gradient-to-r from-emerald-500 to-amber-400'
+                      : 'bg-gradient-to-r from-amber-500 to-orange-400'
+                  }`}
+                  style={{ width: `${Math.min(100, Math.max(8, 100 - posicionUnidad.topPct + 8))}%` }}
+                />
+              </div>
+              <p className={`mt-2 text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                {posicionUnidad.enElite
+                  ? 'Ya estás en el Top 10% Élite de tu unidad. Mantén el estándar.'
+                  : `Te faltan ${posicionUnidad.ptsElite} ${posicionUnidad.ptsElite === 1 ? 'punto' : 'puntos'} para entrar al Top 10% Élite.`}
+              </p>
+            </div>
           </div>
 
         </div>
@@ -1482,15 +1679,30 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
                 </div>
 
                 {planEntrenamientoPrincipal && (
-                  <div className="absolute bottom-3 left-3 right-3">
+                  <div className="absolute bottom-3 left-3 right-3 flex flex-wrap gap-2">
                     <span className="text-xs font-bold text-white bg-slate-900/90 px-3 py-1 rounded-xl border border-slate-700/80 backdrop-blur">
                       {planEntrenamientoPrincipal.diasPorSemana || 4} sesiones por semana
                     </span>
+                    {workoutHoy && (
+                      <span className="text-[10px] font-black uppercase tracking-wide text-emerald-200 bg-emerald-600/90 px-3 py-1 rounded-xl border border-emerald-400/40 backdrop-blur">
+                        Entrenamiento de hoy completado · +{workoutHoy.caloriasQuemadas} kcal quemadas
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
 
               <div className="p-6 space-y-3">
+                {workoutHoy && (
+                  <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-[11px] font-bold ${
+                    isDark
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                      : 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                  }`}>
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    Entrenamiento de hoy completado · +{workoutHoy.caloriasQuemadas} kcal quemadas
+                  </div>
+                )}
                 <h3 className={`text-lg font-black leading-snug group-hover:text-blue-500 transition-colors ${isDark ? 'text-white' : 'text-slate-900'}`}>
                   {planEntrenamientoPrincipal?.nombre || 'Sin plan publicado para tu perfil'}
                 </h3>
@@ -1526,11 +1738,22 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
               )}
               <button
                 onClick={() => {
-                  setPlanEntrenoSeleccionadoId(planesEntrenamientoUsuario[0]?.id || null);
+                  const primer = planesEntrenamientoUsuario[0];
+                  setPlanEntrenoSeleccionadoId(primer?.id || null);
                   setSesionEntrenoIniciada(false);
                   setAudioPlaying(false);
                   setAudioMuted(false);
+                  setVarianteOffset(0);
                   setModalEntrenamientoAbierto(true);
+                  const urls = [
+                    ...(primer?.videosMotivacionalesUrls || []),
+                    ...VIDEOS_MOTIVACIONALES_BASE,
+                  ];
+                  const siguiente = siguienteVideoMotivacional(user.cedula, urls);
+                  if (siguiente) {
+                    markVideoMotivacionVisto(user.cedula, siguiente);
+                    setVideoMotivacionUrl(siguiente);
+                  }
                 }}
                 disabled={!planEntrenamientoPrincipal}
                 className="w-full py-3 px-5 rounded-2xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-blue-600/30 transition-all cursor-pointer"
@@ -2028,7 +2251,88 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
                 ingestaMeta={ingestaCaloricaMeta}
                 onClose={() => setModalNutricionAbierto(false)}
                 alimentos={alimentosCalculadora}
-              />
+                workoutHoy={workoutHoy}
+                menuRanchoIds={menuRanchoVisible.alimentosIdsSugeridos}
+              >
+              <div className={`rounded-3xl border p-4 sm:p-5 space-y-4 ${
+                isDark ? 'bg-slate-950 border-emerald-500/25' : 'bg-emerald-50/60 border-emerald-200'
+              }`}>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-500 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                      🍽️ Menú Diario Sugerido (Rancho / Casa)
+                    </span>
+                    <h4 className={`text-lg font-black mt-2 leading-snug ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                      {menuRanchoVisible.tituloPlatoPrincipal}
+                    </h4>
+                    <p className={`text-[11px] mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                      Planilla real ESFORSFT · rota con el día del mes.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setMenuRanchoOffset((n) => n + 1)}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-[10px] font-black uppercase tracking-wider cursor-pointer shrink-0"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    Ver otro menú del mes
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {([
+                    { emoji: '☀️', label: 'Desayuno', texto: menuRanchoVisible.desayuno },
+                    {
+                      emoji: '🍲',
+                      label: 'Almuerzo',
+                      texto: [
+                        menuRanchoVisible.almuerzo.sopa && `Sopa: ${menuRanchoVisible.almuerzo.sopa}`,
+                        menuRanchoVisible.almuerzo.segundo && `Segundo: ${menuRanchoVisible.almuerzo.segundo}`,
+                      ].filter(Boolean).join(' · '),
+                    },
+                    {
+                      emoji: '🌙',
+                      label: 'Merienda',
+                      texto: [menuRanchoVisible.merienda.plato, menuRanchoVisible.merienda.bebida].filter(Boolean).join(' · '),
+                    },
+                  ] as const).map((bloque) => (
+                    <div
+                      key={bloque.label}
+                      className={`rounded-2xl border p-3 ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}
+                    >
+                      <p className="text-[10px] font-black uppercase tracking-wider text-emerald-400">
+                        {bloque.emoji} {bloque.label}
+                      </p>
+                      <p className={`text-xs leading-relaxed mt-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                        {bloque.texto || '—'}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                {menuRanchoVisible.refrigerio && (
+                  <p className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                    🍎 Refrigerio: {menuRanchoVisible.refrigerio}
+                  </p>
+                )}
+
+                <div className={`rounded-2xl border p-3.5 ${
+                  ajusteHoy === 'deficit'
+                    ? 'bg-amber-500/10 border-amber-500/30'
+                    : ajusteHoy === 'ganancia'
+                    ? 'bg-sky-500/10 border-sky-500/30'
+                    : 'bg-emerald-500/10 border-emerald-500/30'
+                }`}>
+                  <p className={`text-[11px] font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                    🎯 Cómo servirte este menú hoy según tu Somatotipo ({somatotipoActual})
+                  </p>
+                  <ul className={`mt-2 space-y-1 text-[11px] leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                    {porcionesHoy.map((linea) => (
+                      <li key={linea}>• {linea}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+              </CalculadoraCalorica>
 
               {/* Planes prescritos debajo — no se pierden */}
               <div className={`pt-6 border-t space-y-4 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
@@ -2037,10 +2341,13 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
                     Planes prescritos
                   </span>
                   <h4 className={`text-lg font-black mt-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                    Menús sugeridos · {somatotipoActual}
+                    Platos de casa y rancho · {somatotipoActual}
                   </h4>
                   <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                    Referencia del nutricionista según región ({selectedRegion}).
+                    Primero los menús exactos para tu somatotipo en {selectedRegion}
+                    {familiaActual === 'deficit'
+                      ? ' (porciones controladas, sin fritura).'
+                      : ' (almuerzo completo para masa y rendimiento).'}
                   </p>
                 </div>
 
@@ -2049,7 +2356,10 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
                     <button
                       key={reg}
                       type="button"
-                      onClick={() => setSelectedRegion(reg)}
+                      onClick={() => {
+                        setSelectedRegion(reg);
+                        setPlatosCasaExpandido(false);
+                      }}
                       className={`px-3 py-1.5 rounded-xl text-[10px] font-bold shrink-0 cursor-pointer ${
                         selectedRegion === reg
                           ? 'bg-emerald-600 text-white'
@@ -2069,7 +2379,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
                       No hay planes prescritos para tu somatotipo en {selectedRegion}.
                     </p>
                   ) : (
-                    planesNutricionUsuario.map((plan) => (
+                    (platosCasaExpandido ? planesNutricionUsuario : planesNutricionUsuario.slice(0, 3)).map((plan) => (
                       <div
                         key={plan.id}
                         className={`rounded-2xl border p-4 grid grid-cols-1 sm:grid-cols-12 gap-4 ${
@@ -2091,6 +2401,18 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
                           <p className={`text-xs leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                             {plan.descripcion}
                           </p>
+                          <p className={`text-[11px] leading-relaxed font-semibold ${
+                            isDark ? 'text-emerald-300' : 'text-emerald-700'
+                          }`}>
+                            {justificacionPlato(plan)}
+                          </p>
+                          {plan.alimentosRecomendados && plan.alimentosRecomendados.length > 0 && (
+                            <ul className={`text-[11px] space-y-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                              {plan.alimentosRecomendados.map((al, i) => (
+                                <li key={i}>• {al}</li>
+                              ))}
+                            </ul>
+                          )}
                           <div className="flex flex-wrap gap-2 text-[10px] font-mono font-bold">
                             <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-500">
                               {plan.caloriasAprox || 2100} kcal
@@ -2108,6 +2430,22 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
                         </div>
                       </div>
                     ))
+                  )}
+                  {planesNutricionUsuario.length > 3 && (
+                    <button
+                      type="button"
+                      onClick={() => setPlatosCasaExpandido((v) => !v)}
+                      className={`w-full inline-flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider cursor-pointer border ${
+                        isDark
+                          ? 'bg-slate-900 hover:bg-slate-800 text-emerald-300 border-slate-800'
+                          : 'bg-white hover:bg-slate-50 text-emerald-700 border-slate-200'
+                      }`}
+                    >
+                      <ChevronDown className={`w-4 h-4 transition-transform ${platosCasaExpandido ? 'rotate-180' : ''}`} />
+                      {platosCasaExpandido
+                        ? 'Ver menos platos'
+                        : `Ver más platos de casa y rancho (${planesNutricionUsuario.length - 3})`}
+                    </button>
                   )}
                 </div>
               </div>
@@ -2190,7 +2528,10 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
                             <button
                               key={p.id}
                               type="button"
-                              onClick={() => setPlanEntrenoSeleccionadoId(p.id)}
+                              onClick={() => {
+                                setPlanEntrenoSeleccionadoId(p.id);
+                                setVarianteOffset(0);
+                              }}
                               className={`text-left rounded-2xl border overflow-hidden transition-all cursor-pointer ${
                                 active
                                   ? 'border-blue-500 ring-2 ring-blue-500/40 bg-blue-600/10'
@@ -2270,47 +2611,98 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
                           />
                         </div>
 
-                        {musicaVideoId && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSesionEntrenoIniciada(true);
-                              setAudioPlaying(true);
-                            }}
-                            className={`w-full py-3.5 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer transition-all ${
-                              sesionEntrenoIniciada && audioPlaying
-                                ? 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-lg shadow-cyan-600/30'
-                                : 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/30'
-                            }`}
-                          >
-                            {sesionEntrenoIniciada && audioPlaying ? (
-                              <>
-                                <Music className="w-4 h-4" />
-                                Entrenamiento en curso
-                              </>
-                            ) : (
-                              <>
-                                <Play className="w-4 h-4" />
-                                Iniciar entrenamiento
-                              </>
-                            )}
-                          </button>
-                        )}
-                        {!musicaVideoId && (
-                          <button
-                            type="button"
-                            onClick={() => setSesionEntrenoIniciada(true)}
-                            className="w-full py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-blue-600/30"
-                          >
-                            <Play className="w-4 h-4" />
-                            Iniciar entrenamiento
-                          </button>
+                        {planActivo.videoUrl && (
+                          <div className="space-y-2">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                              Video complementario del plan
+                            </span>
+                            <PlanVideoEmbed videoUrl={planActivo.videoUrl} title={planActivo.nombre} />
+                          </div>
                         )}
 
-                        {/* Video del plan */}
-                        {planActivo.videoUrl && (
-                          <PlanVideoEmbed videoUrl={planActivo.videoUrl} title={planActivo.nombre} />
-                        )}
+                        {/* Circuito Interactivo de Ejercicios */}
+                        <div className="space-y-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider">
+                              Circuito Interactivo de Ejercicios
+                            </span>
+                            {circuitoPlan.length > 0 && (
+                              <span className="text-[10px] font-bold text-slate-500">
+                                {circuitoPlan.length} bloques
+                                {!planActivo.rutinaInteractiva?.length ? ' · rotación diaria' : ' · variantes del día'}
+                              </span>
+                            )}
+                          </div>
+                          {enfoqueDia && (
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-[11px] font-black text-amber-200 bg-amber-500/15 border border-amber-500/30 px-3 py-1.5 rounded-xl">
+                                {enfoqueDia}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setVarianteOffset((n) => n + 1)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-[10px] font-black uppercase tracking-wider text-white cursor-pointer"
+                              >
+                                <RefreshCw className="w-3.5 h-3.5" />
+                                Variar ejercicios de hoy
+                              </button>
+                            </div>
+                          )}
+                          {circuitoCargando && (
+                            <p className="text-xs text-slate-500 py-4 text-center">Cargando animaciones del circuito…</p>
+                          )}
+                          {!circuitoCargando && circuitoPlan.length === 0 && (
+                            <p className="text-xs text-slate-500 py-4 text-center">
+                              No se pudo armar el circuito. Revise la conexión e intente de nuevo.
+                            </p>
+                          )}
+                          {!circuitoCargando && circuitoPlan.length > 0 && (
+                            <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                              {circuitoPlan.map((b, idx) => (
+                                <div
+                                  key={b.uid}
+                                  className="flex items-center gap-3 p-2.5 rounded-2xl bg-slate-900 border border-slate-800"
+                                >
+                                  <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-[10px] font-black flex items-center justify-center shrink-0">
+                                    {idx + 1}
+                                  </span>
+                                  <img
+                                    src={b.animacion}
+                                    alt={b.nombre_es}
+                                    loading="lazy"
+                                    className="w-14 h-14 rounded-xl object-contain bg-white shrink-0 border border-slate-700"
+                                  />
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-xs font-bold text-white leading-snug line-clamp-2">{b.nombre_es}</p>
+                                    <p className="text-[10px] text-slate-500 uppercase tracking-wide truncate">
+                                      {b.grupo_muscular} · {b.equipo}
+                                    </p>
+                                    <p className="text-[10px] font-bold text-cyan-300 mt-0.5">
+                                      {b.series}×
+                                      {b.modo === 'tiempo' ? `${b.duracionSeg}s` : `${b.repeticiones} reps`}
+                                      {' · '}
+                                      {b.descansoSeg}s descanso
+                                    </p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={abrirPlayerEntrenamiento}
+                          disabled={circuitoCargando || circuitoPlan.length === 0}
+                          className={`w-full py-3.5 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                            playerAbierto || sesionEntrenoIniciada
+                              ? 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-lg shadow-cyan-600/30'
+                              : 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/30'
+                          }`}
+                        >
+                          <Play className="w-4 h-4" />
+                          {playerAbierto ? 'Entrenamiento en curso' : 'Iniciar entrenamiento'}
+                        </button>
 
                         {/* Protocolos opcionales */}
                         {planActivo.ejerciciosClave && planActivo.ejerciciosClave.length > 0 && (
@@ -2353,6 +2745,55 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
         );
       })()}
 
+      {playerAbierto && planModalActivo && (
+        <WorkoutPlayerModal
+          plan={{
+            ...planModalActivo,
+            rutinaInteractiva: circuitoPlan.length ? circuitoPlan : planModalActivo.rutinaInteractiva,
+          }}
+          pesoUsuarioKg={medActual.peso}
+          somatotipoUsuario={somatotipoActual}
+          nombreUsuario={nombreCompleto}
+          isDark={isDark}
+          audioPlaying={audioPlaying}
+          audioMuted={audioMuted}
+          onToggleAudio={() => {
+            setSesionEntrenoIniciada(true);
+            setAudioPlaying((prev) => !prev);
+          }}
+          onToggleMute={() => setAudioMuted((prev) => !prev)}
+          onClose={cerrarPlayerEntrenamiento}
+          onWorkoutCompleted={(resumen) => {
+            saveWorkoutCompletadoHoy(user.cedula, {
+              planId: planModalActivo.id,
+              planNombre: planModalActivo.nombre,
+              caloriasQuemadas: resumen.caloriasQuemadas,
+              duracionTotalSeg: resumen.duracionTotalSeg,
+              ejerciciosCompletados: resumen.ejerciciosCompletados,
+            });
+            setWorkoutHoy(loadWorkoutCompletadoHoy(user.cedula));
+            setPlayerAbierto(false);
+            setAudioPlaying(false);
+            setSesionEntrenoIniciada(false);
+          }}
+        />
+      )}
+
+      {videoMotivacionUrl && (
+        <MotivacionVideoPopup
+          url={videoMotivacionUrl}
+          onContinuar={() => {
+            setVideoMotivacionUrl(null);
+            if (pendientePlayer && planModalActivo) {
+              setPendientePlayer(false);
+              setSesionEntrenoIniciada(true);
+              if (planModalActivo.musicaFondoUrl) setAudioPlaying(true);
+              setPlayerAbierto(true);
+            }
+          }}
+        />
+      )}
+
       {/* MODAL DETALLE DE SOMATOTIPO */}
       {modalSomatotipo && (
         <SomatotipoModal
@@ -2369,6 +2810,15 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
 
       {modalPinAbierto && (
         <CambiarPinModal cedula={user.cedula} onClose={() => setModalPinAbierto(false)} />
+      )}
+
+      {modalCarneAbierto && (
+        <CarneInbodyModal
+          user={user}
+          medicion={medActual}
+          edadCronologica={edad}
+          onClose={() => setModalCarneAbierto(false)}
+        />
       )}
 
     </div>

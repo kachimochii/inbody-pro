@@ -1,8 +1,62 @@
 import { PlanEntrenamiento, FichaEdadCatalogo, PlanNutricion } from '../types/inbody';
+import { fechaHoyEcuador } from './inbodyCalculations';
 
 const KEY_PLANES_ENTRENO = 'inbody_planes_entrenamiento_v3';
 const KEY_FICHAS_EDAD = 'inbody_fichas_edad_v2';
-const KEY_PLANES_NUTRI = 'inbody_planes_nutricion_v1';
+const KEY_PLANES_NUTRI = 'inbody_planes_nutricion_v3';
+const KEY_WORKOUT_PREFIX = 'inbody_workout_done_';
+
+export interface WorkoutCompletadoHoy {
+  planId: string;
+  planNombre: string;
+  caloriasQuemadas: number;
+  duracionTotalSeg: number;
+  ejerciciosCompletados: number;
+  fecha: string;
+}
+
+function workoutKey(cedula: string, fecha = fechaHoyEcuador()): string {
+  return `${KEY_WORKOUT_PREFIX}${cedula}_${fecha}`;
+}
+
+export function loadWorkoutCompletadoHoy(cedula: string): WorkoutCompletadoHoy | null {
+  return safeParse<WorkoutCompletadoHoy | null>(localStorage.getItem(workoutKey(cedula)), null);
+}
+
+export function saveWorkoutCompletadoHoy(cedula: string, data: Omit<WorkoutCompletadoHoy, 'fecha'>): void {
+  const fecha = fechaHoyEcuador();
+  try {
+    localStorage.setItem(workoutKey(cedula, fecha), JSON.stringify({ ...data, fecha }));
+  } catch (err) {
+    console.warn('No se pudo guardar el entrenamiento del día.', err);
+  }
+}
+
+function videosMotivacionKey(cedula: string): string {
+  return `inbody_videos_motivacion_vistos_${cedula}`;
+}
+
+export function loadVideosMotivacionVistos(cedula: string): string[] {
+  const raw = safeParse<string[] | null>(localStorage.getItem(videosMotivacionKey(cedula)), null);
+  return Array.isArray(raw) ? raw.filter((u) => typeof u === 'string' && u.trim()) : [];
+}
+
+export function markVideoMotivacionVisto(cedula: string, url: string): void {
+  const limpio = String(url || '').trim();
+  if (!limpio) return;
+  const prev = loadVideosMotivacionVistos(cedula);
+  if (prev.includes(limpio)) return;
+  try {
+    localStorage.setItem(videosMotivacionKey(cedula), JSON.stringify([...prev, limpio]));
+  } catch (err) {
+    console.warn('No se pudo guardar el historial de videos motivacionales.', err);
+  }
+}
+
+export function siguienteVideoMotivacional(cedula: string, urls: string[]): string | null {
+  const vistos = loadVideosMotivacionVistos(cedula);
+  return urls.map((u) => String(u || '').trim()).filter(Boolean).find((u) => !vistos.includes(u)) || null;
+}
 
 export const DEFAULT_FICHAS_EDAD: FichaEdadCatalogo[] = [
   { id: 'ficha-1', nombre: 'Ficha 1 (20 a 30 años)', edadMin: 20, edadMax: 30 },
