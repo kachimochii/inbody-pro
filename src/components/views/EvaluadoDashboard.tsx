@@ -1083,8 +1083,8 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
               <ChevronRight className="w-3 h-3" />
             </span>
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)_minmax(0,1.15fr)] gap-2 items-stretch">
-            <div className={`rounded-xl border flex items-center justify-center p-1 lg:p-2 max-lg:max-h-[180px] lg:min-h-[260px] overflow-hidden ${
+          <div className="grid grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] lg:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)_minmax(0,1.15fr)] gap-1.5 lg:gap-2 items-stretch">
+            <div className={`rounded-xl border flex items-center justify-center p-1 lg:p-2 lg:min-h-[260px] overflow-visible lg:overflow-hidden ${
               isDark ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-50 border-slate-200'
             }`}>
               <ManiquiSegmentalSvg
@@ -1103,63 +1103,76 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
             </div>
             <div className="min-w-0 h-full flex flex-col gap-1 lg:gap-1.5">
                 {(() => {
-                  const renderZona = (id: SegZona, variant: 'tile' | 'wide' = 'tile') => {
+                  const renderZona = (id: SegZona, variant: 'tile' | 'wide' | 'row' = 'tile') => {
                     const z = zonas.find((x) => x.id === id)!;
                     const isTile = variant === 'tile';
+                    const isRow = variant === 'row';
+                    const pctColor = z.musculoPct >= 100 ? 'text-emerald-400' : z.musculoPct >= 90 ? 'text-blue-400' : 'text-amber-400';
                     return (
                       <button
                         key={z.id}
                         type="button"
                         onClick={() => setSegmentoSeleccionado(z.id)}
-                        className={`flex flex-col border transition-all cursor-pointer ${
-                          isTile
-                            ? 'items-center justify-center text-center px-1.5 py-1 lg:px-2 lg:py-1.5 lg:aspect-[5/2] rounded-lg lg:rounded-xl'
-                            : 'justify-center px-2 py-1 lg:px-2.5 lg:py-2 lg:min-h-[72px] rounded-lg lg:rounded-xl'
+                        className={`border transition-all cursor-pointer ${
+                          isRow
+                            ? 'flex flex-row items-center gap-1 px-1.5 py-1 rounded-lg text-left'
+                            : isTile
+                            ? 'flex flex-col items-center justify-center text-center px-2 py-1.5 aspect-[5/2] rounded-xl'
+                            : 'flex flex-col justify-center px-2.5 py-2 min-h-[72px] rounded-xl'
                         } ${
                           segmentoSeleccionado === z.id
                             ? 'bg-cyan-500/15 border-cyan-400 ring-1 ring-cyan-400'
                             : isDark ? 'bg-slate-900 border-slate-800 hover:border-slate-700' : 'bg-slate-100 border-slate-200 hover:border-slate-300'
                         }`}
                       >
-                        <span className={`${isTile ? 'text-xs lg:text-base' : 'text-xs lg:text-sm'} leading-none`}>{z.icon}</span>
-                        <span className="mt-0.5 lg:mt-1 text-[9px] text-slate-400 font-semibold">{z.label}</span>
-                        <span className={`mt-0.5 font-black font-mono leading-tight ${isDark ? 'text-white' : 'text-slate-900'} ${isTile ? 'text-[11px] lg:text-[13px]' : 'text-xs lg:text-sm'}`}>
+                        <span className={`${isRow ? 'text-[11px]' : isTile ? 'text-base' : 'text-sm'} leading-none shrink-0`}>{z.icon}</span>
+                        <span className={`${isRow ? 'w-[46px] text-[9px] truncate' : 'mt-1 text-[9px]'} text-slate-400 font-semibold shrink-0`}>{z.label}</span>
+                        <span className={`font-black font-mono leading-tight shrink-0 ${isDark ? 'text-white' : 'text-slate-900'} ${isRow ? 'text-[10px]' : isTile ? 'mt-0.5 text-[13px]' : 'mt-0.5 text-sm'}`}>
                           {z.musculo.toFixed(z.id === 'TR' ? 1 : 2)}
                           <span className="text-[8px] font-semibold text-slate-500"> kg</span>
-                          <span className={`ml-1 text-[9px] font-black ${
-                            z.musculoPct >= 100 ? 'text-emerald-400' : z.musculoPct >= 90 ? 'text-blue-400' : 'text-amber-400'
-                          }`}>
+                          <span className={`ml-0.5 text-[8px] font-black ${pctColor}`}>
                             {z.musculoPct}%
                           </span>
                         </span>
-                        <div className={`mt-1 h-1 rounded-full overflow-hidden ${isTile ? 'w-[78%]' : 'w-full'} ${isDark ? 'bg-slate-800' : 'bg-slate-200'}`}>
+                        <div className={`${isRow ? 'flex-1 min-w-[28px]' : isTile ? 'mt-1.5 w-[78%]' : 'mt-1.5 w-full'} h-1 rounded-full overflow-hidden ${isDark ? 'bg-slate-800' : 'bg-slate-200'}`}>
                           <div
                             className={`h-full rounded-full ${colorBarraSegmento(z.musculoPct)}`}
                             style={{ width: `${clampPct(z.musculoPct)}%` }}
                           />
                         </div>
-                        <span className="mt-1 text-[8px] text-amber-400/80 font-semibold">
-                          Grasa {z.grasaSeg.toFixed(1)} kg
-                        </span>
+                        {!isRow && (
+                          <span className="mt-1 text-[8px] text-amber-400/80 font-semibold">
+                            Grasa {z.grasaSeg.toFixed(1)} kg
+                          </span>
+                        )}
                       </button>
                     );
                   };
                   return (
                     <>
-                      <div className="grid grid-cols-2 gap-1 lg:gap-1.5">
-                        {renderZona('BD')}
-                        {renderZona('BI')}
+                      <div className="flex flex-col gap-1 lg:hidden">
+                        {renderZona('BD', 'row')}
+                        {renderZona('BI', 'row')}
+                        {renderZona('TR', 'row')}
+                        {renderZona('PD', 'row')}
+                        {renderZona('PI', 'row')}
                       </div>
-                      {renderZona('TR', 'wide')}
-                      <div className="grid grid-cols-2 gap-1 lg:gap-1.5">
-                        {renderZona('PD')}
-                        {renderZona('PI')}
+                      <div className="hidden lg:flex lg:flex-col lg:gap-1.5">
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {renderZona('BD')}
+                          {renderZona('BI')}
+                        </div>
+                        {renderZona('TR', 'wide')}
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {renderZona('PD')}
+                          {renderZona('PI')}
+                        </div>
                       </div>
                     </>
                   );
                 })()}
 
-                <div className={`mt-auto shrink-0 p-2 rounded-xl border ${
+                <div className={`hidden lg:block mt-auto shrink-0 p-2 rounded-xl border ${
                   isDark ? 'bg-slate-900/90 border-blue-500/30' : 'bg-blue-50/80 border-blue-200'
                 }`}>
                   <div className="flex flex-wrap items-center justify-between gap-1">
@@ -1205,7 +1218,7 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
                 </div>
               </div>
 
-              <div className="min-w-0 h-full grid grid-rows-3 gap-1.5">
+              <div className="hidden lg:grid min-w-0 h-full grid-rows-3 gap-1.5">
             <div className={`p-2 rounded-xl border flex flex-col justify-center ${isDark ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
               <div className="flex items-center justify-between gap-1.5">
                 <span className={`text-[11px] font-bold flex items-center gap-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
@@ -1341,6 +1354,47 @@ export const EvaluadoDashboard: React.FC<EvaluadoDashboardProps> = ({
               </div>
             </div>
           </div>
+          </div>
+          <div className={`lg:hidden p-2 rounded-xl border ${
+            isDark ? 'bg-slate-900/90 border-blue-500/30' : 'bg-blue-50/80 border-blue-200'
+          }`}>
+            <div className="flex flex-wrap items-center justify-between gap-1">
+              <span className="text-[10px] font-black text-blue-400 tracking-wide truncate">
+                Diagnóstico: {infoSeg.corto}
+              </span>
+              <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-md border shrink-0 ${
+                isDark
+                  ? 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30'
+                  : 'bg-cyan-50 text-cyan-700 border-cyan-200'
+              }`}>
+                {infoSeg.simetriaVsOpuesto}
+              </span>
+            </div>
+            <div className="mt-1 grid grid-cols-2 gap-1">
+              <div className={`rounded-md border px-1.5 py-0.5 ${
+                isDark ? 'bg-blue-500/10 border-blue-500/25' : 'bg-blue-50 border-blue-200'
+              }`}>
+                <span className={`text-[9px] font-black ${isDark ? 'text-blue-200' : 'text-blue-800'}`}>
+                  💪 {infoSeg.musculo.toFixed(2)} kg ({infoSeg.musculoPct}%)
+                </span>
+                <div className={`mt-0.5 h-1 rounded-full overflow-hidden ${isDark ? 'bg-slate-800' : 'bg-blue-100'}`}>
+                  <div
+                    className={`h-full rounded-full ${infoSeg.musculoPct >= 100 ? 'bg-emerald-400' : 'bg-blue-500'}`}
+                    style={{ width: `${musculoBarW}%` }}
+                  />
+                </div>
+              </div>
+              <div className={`rounded-md border px-1.5 py-0.5 ${
+                isDark ? 'bg-rose-500/10 border-rose-500/25' : 'bg-amber-50 border-amber-200'
+              }`}>
+                <span className={`text-[9px] font-black ${isDark ? 'text-amber-200' : 'text-amber-800'}`}>
+                  🔥 {infoSeg.grasa.toFixed(2)} kg
+                </span>
+                <div className={`mt-0.5 h-1 rounded-full overflow-hidden ${isDark ? 'bg-slate-800' : 'bg-amber-100'}`}>
+                  <div className="h-full rounded-full bg-gradient-to-r from-amber-400 to-rose-400" style={{ width: `${grasaBarW}%` }} />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
             );

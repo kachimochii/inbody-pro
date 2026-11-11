@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, TrendingDown, TrendingUp, Zap, Timer, RotateCcw } from 'lucide-react';
 import { InBodyRecord, Sexo } from '../types/inbody';
 import { resolveAnalisisCorporal } from '../utils/inbodyCalculations';
@@ -28,6 +28,7 @@ export const EdadCorporalCard: React.FC<EdadCorporalCardProps> = ({
 }) => {
   const { isDark } = useTheme();
   const [simOpen, setSimOpen] = useState(false);
+  const simRef = useRef<HTMLDivElement>(null);
   const [bajarGrasa, setBajarGrasa] = useState(0);
   const [subirMusculo, setSubirMusculo] = useState(0);
 
@@ -215,7 +216,17 @@ export const EdadCorporalCard: React.FC<EdadCorporalCardProps> = ({
 
           <button
             type="button"
-            onClick={() => setSimOpen((v) => !v)}
+            onClick={() => {
+              setSimOpen((v) => {
+                const next = !v;
+                if (next) {
+                  window.setTimeout(() => {
+                    simRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                  }, 60);
+                }
+                return next;
+              });
+            }}
             className={`w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider cursor-pointer border ${
               simOpen
                 ? 'bg-slate-800 border-cyan-500/40 text-cyan-300'
@@ -224,11 +235,18 @@ export const EdadCorporalCard: React.FC<EdadCorporalCardProps> = ({
           >
             🎛️ Simular cómo bajar mi Edad Corporal
           </button>
+
+          {simOpen && (
+            <p className="md:hidden text-[10px] font-black text-center text-cyan-300">
+              El simulador está aquí abajo. Mueve las barras.
+            </p>
+          )}
         </div>
 
-        {/* LADO DERECHO: FACTORES + SIMULADOR APARTE */}
-        <div className="flex flex-col gap-4">
-          <div className="space-y-2">
+        {/* LADO DERECHO: FACTORES + SIMULADOR APARTE.
+            En celular el simulador sube justo debajo del botón (order). */}
+        <div className="contents md:flex md:flex-col md:gap-4">
+          <div className="order-2 md:order-none space-y-2">
           <h4 className={`text-[10px] font-black uppercase tracking-widest mb-2 border-b pb-1.5 ${mutedCls} ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
             Factores Determinantes (InBody 270S)
           </h4>
@@ -304,7 +322,7 @@ export const EdadCorporalCard: React.FC<EdadCorporalCardProps> = ({
           </div>
 
           {simOpen && (
-            <div className={`rounded-2xl border p-3.5 space-y-3 ${simCls}`}>
+            <div ref={simRef} className={`order-1 md:order-none rounded-2xl border p-3.5 space-y-3 ring-2 ring-cyan-400/70 ${simCls}`}>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-[10px] font-black uppercase tracking-wider text-cyan-400">
                   ¿Qué pasa si bajo grasa / subo músculo?
